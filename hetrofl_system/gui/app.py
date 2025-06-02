@@ -6,10 +6,13 @@ import os
 import sys
 import threading
 import time
+import psutil
 from datetime import datetime
 from typing import Dict, Any, Optional
 import numpy as np
 from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score
+from functools import lru_cache
+import gc
 
 # Add parent directory to path for imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -154,6 +157,236 @@ def get_status():
     
     return jsonify(status)
 
+@app.route('/api/system/resources')
+def get_system_resources():
+    """Get real-time system resource usage."""
+    try:
+        # CPU usage
+        cpu_percent = psutil.cpu_percent(interval=1)
+        cpu_count = psutil.cpu_count()
+        
+        # Memory usage
+        memory = psutil.virtual_memory()
+        memory_percent = memory.percent
+        memory_used = memory.used / (1024**3)  # GB
+        memory_total = memory.total / (1024**3)  # GB
+        
+        # Disk usage
+        disk = psutil.disk_usage('/')
+        disk_percent = disk.percent
+        disk_used = disk.used / (1024**3)  # GB
+        disk_total = disk.total / (1024**3)  # GB
+        
+        # Network I/O
+        network = psutil.net_io_counters()
+        
+        # Process info
+        process = psutil.Process()
+        process_memory = process.memory_info().rss / (1024**2)  # MB
+        process_cpu = process.cpu_percent()
+        
+        return jsonify({
+            'cpu': {
+                'percent': cpu_percent,
+                'count': cpu_count
+            },
+            'memory': {
+                'percent': memory_percent,
+                'used_gb': round(memory_used, 2),
+                'total_gb': round(memory_total, 2)
+            },
+            'disk': {
+                'percent': disk_percent,
+                'used_gb': round(disk_used, 2),
+                'total_gb': round(disk_total, 2)
+            },
+            'network': {
+                'bytes_sent': network.bytes_sent,
+                'bytes_recv': network.bytes_recv
+            },
+            'process': {
+                'memory_mb': round(process_memory, 2),
+                'cpu_percent': process_cpu
+            },
+            'timestamp': datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting system resources: {e}")
+        return jsonify({'error': str(e)})
+
+@app.route('/api/training/predictions')
+def get_training_predictions():
+    """Get performance predictions using meta-learning."""
+    global coordinator, metrics_tracker
+    
+    if not coordinator or not metrics_tracker:
+        return jsonify({'error': 'System not initialized'})
+    
+    try:
+        predictions = {}
+        
+        # Get current metrics history
+        global_df = metrics_tracker.get_metrics_dataframe()
+        
+        if not global_df.empty and len(global_df) >= 3:
+            # Simple trend analysis for predictions
+            recent_accuracy = global_df['accuracy'].tail(3).values
+            recent_f1 = global_df['f1_score'].tail(3).values
+            
+            # Calculate trends
+            accuracy_trend = np.polyfit(range(len(recent_accuracy)), recent_accuracy, 1)[0]
+            f1_trend = np.polyfit(range(len(recent_f1)), recent_f1, 1)[0]
+            
+            # Predict next round performance
+            next_accuracy = recent_accuracy[-1] + accuracy_trend
+            next_f1 = recent_f1[-1] + f1_trend
+            
+            predictions['global'] = {
+                'next_round_accuracy': max(0, min(1, next_accuracy)),
+                'next_round_f1': max(0, min(1, next_f1)),
+                'accuracy_trend': 'improving' if accuracy_trend > 0 else 'declining',
+                'f1_trend': 'improving' if f1_trend > 0 else 'declining',
+                'confidence': 0.75  # Simple confidence score
+            }
+        else:
+            predictions['global'] = {
+                'next_round_accuracy': 0.5,
+                'next_round_f1': 0.5,
+                'accuracy_trend': 'unknown',
+                'f1_trend': 'unknown',
+                'confidence': 0.0
+            }
+        
+        # Predict for local models
+        predictions['local'] = {}
+        for model_name in LOCAL_MODELS.keys():
+            try:
+                local_df = metrics_tracker.get_metrics_dataframe(model_name)
+                if not local_df.empty and len(local_df) >= 3:
+                    recent_acc = local_df['accuracy'].tail(3).values
+                    acc_trend = np.polyfit(range(len(recent_acc)), recent_acc, 1)[0]
+                    next_acc = recent_acc[-1] + acc_trend
+                    
+                    predictions['local'][model_name] = {
+                        'next_round_accuracy': max(0, min(1, next_acc)),
+                        'trend': 'improving' if acc_trend > 0 else 'declining',
+                        'confidence': 0.7
+                    }
+                else:
+                    predictions['local'][model_name] = {
+                        'next_round_accuracy': 0.5,
+                        'trend': 'unknown',
+                        'confidence': 0.0
+                    }
+            except Exception as e:
+                logger.warning(f"Error predicting for {model_name}: {e}")
+                predictions['local'][model_name] = {
+                    'next_round_accuracy': 0.5,
+                    'trend': 'unknown',
+                    'confidence': 0.0
+                }
+        
+        return jsonify(predictions)
+        
+    except Exception as e:
+        logger.error(f"Error generating predictions: {e}")
+        return jsonify({'error': str(e)})
+
+@app.route('/api/models/interpretability')
+def get_model_interpretability():
+    """Get model interpretability data (feature importance, etc.)."""
+    global coordinator
+    
+    if not coordinator:
+        return jsonify({'error': 'System not initialized'})
+    
+    try:
+        interpretability_data = {}
+        
+        # Get feature importance for each local model
+        for model_name, model_adapter in coordinator.local_models.items():
+            try:
+                if model_adapter.is_loaded and model_adapter.model is not None:
+                    importance_data = {}
+                    
+                    if model_name == 'xgboost':
+                        # XGBoost feature importance
+                        if hasattr(model_adapter.model, 'get_score'):
+                            importance = model_adapter.model.get_score(importance_type='weight')
+                            importance_data = {
+                                'feature_importance': importance,
+                                'top_features': sorted(importance.items(), key=lambda x: x[1], reverse=True)[:10]
+                            }
+                    
+                    elif model_name == 'random_forest':
+                        # Random Forest feature importance
+                        if hasattr(model_adapter.model, 'feature_importances_'):
+                            importances = model_adapter.model.feature_importances_
+                            feature_names = [f'feature_{i}' for i in range(len(importances))]
+                            importance_data = {
+                                'feature_importance': dict(zip(feature_names, importances)),
+                                'top_features': sorted(zip(feature_names, importances), key=lambda x: x[1], reverse=True)[:10]
+                            }
+                    
+                    elif model_name == 'catboost':
+                        # CatBoost feature importance
+                        if hasattr(model_adapter.model, 'get_feature_importance'):
+                            importances = model_adapter.model.get_feature_importance()
+                            feature_names = [f'feature_{i}' for i in range(len(importances))]
+                            importance_data = {
+                                'feature_importance': dict(zip(feature_names, importances)),
+                                'top_features': sorted(zip(feature_names, importances), key=lambda x: x[1], reverse=True)[:10]
+                            }
+                    
+                    interpretability_data[model_name] = importance_data
+                else:
+                    interpretability_data[model_name] = {'error': 'Model not loaded'}
+                    
+            except Exception as e:
+                logger.warning(f"Error getting interpretability for {model_name}: {e}")
+                interpretability_data[model_name] = {'error': str(e)}
+        
+        return jsonify(interpretability_data)
+        
+    except Exception as e:
+        logger.error(f"Error getting model interpretability: {e}")
+        return jsonify({'error': str(e)})
+
+@app.route('/api/data/preprocessing/status')
+def get_preprocessing_status():
+    """Get data preprocessing pipeline status."""
+    global data_loader
+    
+    if not data_loader:
+        return jsonify({'error': 'Data loader not initialized'})
+    
+    try:
+        status = {
+            'dataset_path': str(data_loader.dataset_path),
+            'target_column': data_loader.target_column,
+            'columns_to_drop': data_loader.columns_to_drop,
+            'scaler_fitted': data_loader.scaler is not None,
+            'encoder_fitted': data_loader.label_encoder is not None,
+            'last_processed': datetime.now().isoformat()
+        }
+        
+        # Check if dataset file exists
+        if os.path.exists(data_loader.dataset_path):
+            file_stats = os.stat(data_loader.dataset_path)
+            status['file_size_mb'] = round(file_stats.st_size / (1024**2), 2)
+            status['file_modified'] = datetime.fromtimestamp(file_stats.st_mtime).isoformat()
+            status['file_exists'] = True
+        else:
+            status['file_exists'] = False
+            status['error'] = 'Dataset file not found'
+        
+        return jsonify(status)
+        
+    except Exception as e:
+        logger.error(f"Error getting preprocessing status: {e}")
+        return jsonify({'error': str(e)})
+
 @app.route('/api/models/info')
 def get_models_info():
     """Get information about all models."""
@@ -294,37 +527,82 @@ def get_latest_metrics():
         logger.error(f"Error in get_latest_metrics: {e}")
         return jsonify({'error': str(e)})
 
+# Cache for metrics history to improve performance
+_metrics_cache = {}
+_cache_timestamp = None
+_cache_duration = 5  # seconds
+
 @app.route('/api/metrics/history')
 def get_metrics_history():
-    """Get metrics history for visualization."""
-    global metrics_tracker
+    """Get metrics history for visualization with caching."""
+    global metrics_tracker, _metrics_cache, _cache_timestamp
     
     if not metrics_tracker:
         return jsonify({'error': 'Metrics tracker not initialized'})
     
     try:
+        # Check cache validity
+        current_time = time.time()
+        if (_cache_timestamp and 
+            current_time - _cache_timestamp < _cache_duration and 
+            _metrics_cache):
+            return jsonify(_metrics_cache)
+        
         history = {
             'global': [],
             'local': {}
         }
         
-        # Get global history
+        # Get global history with enhanced error handling
         try:
             global_df = metrics_tracker.get_metrics_dataframe()
             if not global_df.empty:
+                # Ensure all required columns exist
+                required_columns = ['accuracy', 'f1_score', 'precision', 'recall', 'loss', 'training_time']
+                for col in required_columns:
+                    if col not in global_df.columns:
+                        global_df[col] = 0.0
+                
+                # Add round numbers if not present
+                if 'round' not in global_df.columns:
+                    global_df['round'] = range(1, len(global_df) + 1)
+                
+                # Add timestamp if not present
+                if 'timestamp' not in global_df.columns:
+                    global_df['timestamp'] = datetime.now().isoformat()
+                
                 history['global'] = global_df.to_dict('records')
+                logger.info(f"Loaded {len(history['global'])} global metrics records")
             else:
-                # If no real data, use sample data
-                from hetrofl_system.utils.visualization_data import generate_sample_metrics_history
-                sample_history = generate_sample_metrics_history()
-                history['global'] = sample_history['global']
-                history['local'] = sample_history['local']
-                logger.info("No metrics history available, using sample visualization data")
-                return jsonify(history)
+                # If no real data, try to use sample data
+                try:
+                    from hetrofl_system.utils.visualization_data import generate_sample_metrics_history
+                    sample_history = generate_sample_metrics_history()
+                    history['global'] = sample_history['global']
+                    history['local'] = sample_history['local']
+                    logger.info("No real metrics history available, using sample visualization data")
+                    
+                    # Cache the sample data
+                    _metrics_cache = history
+                    _cache_timestamp = current_time
+                    return jsonify(history)
+                except ImportError:
+                    # Fallback to basic structure
+                    history['global'] = [{
+                        'round': 1,
+                        'accuracy': 0.0,
+                        'f1_score': 0.0,
+                        'precision': 0.0,
+                        'recall': 0.0,
+                        'loss': 1.0,
+                        'training_time': 0.0,
+                        'timestamp': datetime.now().isoformat()
+                    }]
+                    logger.info("Using fallback metrics structure")
         except Exception as e:
             logger.warning(f"Error getting global metrics history: {e}")
             history['global'] = [{
-                'round': 0,
+                'round': 1,
                 'accuracy': 0.0,
                 'f1_score': 0.0,
                 'precision': 0.0,
@@ -334,16 +612,31 @@ def get_metrics_history():
                 'timestamp': datetime.now().isoformat()
             }]
         
-        # Get history for each local model
+        # Get history for each local model with enhanced error handling
         for model_name in LOCAL_MODELS.keys():
             try:
                 df = metrics_tracker.get_metrics_dataframe(model_name)
                 if not df.empty:
+                    # Ensure all required columns exist
+                    required_columns = ['accuracy', 'f1_score', 'precision', 'recall', 'loss', 'training_time']
+                    for col in required_columns:
+                        if col not in df.columns:
+                            df[col] = 0.0
+                    
+                    # Add round numbers if not present
+                    if 'round' not in df.columns:
+                        df['round'] = range(1, len(df) + 1)
+                    
+                    # Add timestamp if not present
+                    if 'timestamp' not in df.columns:
+                        df['timestamp'] = datetime.now().isoformat()
+                    
                     history['local'][model_name] = df.to_dict('records')
+                    logger.info(f"Loaded {len(history['local'][model_name])} records for {model_name}")
                 else:
-                    # Provide sample data point for visualization
+                    # Provide consistent structure for empty models
                     history['local'][model_name] = [{
-                        'round': 0,
+                        'round': 1,
                         'accuracy': 0.0,
                         'f1_score': 0.0,
                         'precision': 0.0,
@@ -355,7 +648,7 @@ def get_metrics_history():
             except Exception as e:
                 logger.warning(f"Error getting metrics history for {model_name}: {e}")
                 history['local'][model_name] = [{
-                    'round': 0,
+                    'round': 1,
                     'accuracy': 0.0,
                     'f1_score': 0.0,
                     'precision': 0.0,
@@ -365,11 +658,42 @@ def get_metrics_history():
                     'timestamp': datetime.now().isoformat()
                 }]
         
+        # Cache the results
+        _metrics_cache = history
+        _cache_timestamp = current_time
+        
         return jsonify(history)
         
     except Exception as e:
         logger.error(f"Error in get_metrics_history: {e}")
-        return jsonify({'error': str(e)})
+        # Return a safe fallback structure
+        fallback_history = {
+            'global': [{
+                'round': 1,
+                'accuracy': 0.0,
+                'f1_score': 0.0,
+                'precision': 0.0,
+                'recall': 0.0,
+                'loss': 1.0,
+                'training_time': 0.0,
+                'timestamp': datetime.now().isoformat()
+            }],
+            'local': {}
+        }
+        
+        for model_name in LOCAL_MODELS.keys():
+            fallback_history['local'][model_name] = [{
+                'round': 1,
+                'accuracy': 0.0,
+                'f1_score': 0.0,
+                'precision': 0.0,
+                'recall': 0.0,
+                'loss': 1.0,
+                'training_time': 0.0,
+                'timestamp': datetime.now().isoformat()
+            }]
+        
+        return jsonify(fallback_history)
 
 @app.route('/api/metrics/improvements')
 def get_improvements():
@@ -827,43 +1151,184 @@ def handle_disconnect():
     """Handle client disconnection."""
     logger.info('Client disconnected')
 
+@app.route('/api/reports/generate', methods=['POST'])
+def generate_report():
+    """Generate automated training report."""
+    global coordinator, metrics_tracker
+    
+    if not coordinator or not metrics_tracker:
+        return jsonify({'error': 'System not initialized'})
+    
+    try:
+        data = request.get_json() or {}
+        report_type = data.get('type', 'summary')  # summary, detailed, comparison
+        
+        report = {
+            'type': report_type,
+            'generated_at': datetime.now().isoformat(),
+            'system_info': {},
+            'training_summary': {},
+            'model_performance': {},
+            'recommendations': []
+        }
+        
+        # System information
+        try:
+            system_resources = get_system_resources().get_json()
+            report['system_info'] = {
+                'cpu_usage': system_resources.get('cpu', {}).get('percent', 0),
+                'memory_usage': system_resources.get('memory', {}).get('percent', 0),
+                'disk_usage': system_resources.get('disk', {}).get('percent', 0)
+            }
+        except Exception as e:
+            logger.warning(f"Error getting system info for report: {e}")
+        
+        # Training summary
+        try:
+            latest_metrics = get_latest_metrics().get_json()
+            if not latest_metrics.get('error'):
+                report['training_summary'] = {
+                    'global_accuracy': latest_metrics.get('global', {}).get('accuracy', 0),
+                    'global_f1': latest_metrics.get('global', {}).get('f1_score', 0),
+                    'local_models_count': len(latest_metrics.get('local', {})),
+                    'best_local_model': max(
+                        latest_metrics.get('local', {}).items(),
+                        key=lambda x: x[1].get('accuracy', 0),
+                        default=('none', {'accuracy': 0})
+                    )[0]
+                }
+        except Exception as e:
+            logger.warning(f"Error getting training summary for report: {e}")
+        
+        # Model performance details
+        try:
+            models_info = get_models_info().get_json()
+            if not models_info.get('error'):
+                report['model_performance'] = {}
+                for model_name, info in models_info.get('local_models', {}).items():
+                    report['model_performance'][model_name] = {
+                        'is_loaded': info.get('is_loaded', False),
+                        'model_type': info.get('model_type', 'Unknown'),
+                        'features': info.get('n_features', 0),
+                        'classes': info.get('n_classes', 0)
+                    }
+        except Exception as e:
+            logger.warning(f"Error getting model performance for report: {e}")
+        
+        # Generate recommendations
+        try:
+            global_acc = report['training_summary'].get('global_accuracy', 0)
+            if global_acc < 0.8:
+                report['recommendations'].append("Consider increasing training rounds or adjusting hyperparameters")
+            if global_acc > 0.95:
+                report['recommendations'].append("Excellent performance! Consider testing on new datasets")
+            
+            cpu_usage = report['system_info'].get('cpu_usage', 0)
+            if cpu_usage > 80:
+                report['recommendations'].append("High CPU usage detected. Consider optimizing batch sizes")
+            
+            memory_usage = report['system_info'].get('memory_usage', 0)
+            if memory_usage > 85:
+                report['recommendations'].append("High memory usage. Consider reducing dataset size or model complexity")
+        except Exception as e:
+            logger.warning(f"Error generating recommendations: {e}")
+        
+        return jsonify(report)
+        
+    except Exception as e:
+        logger.error(f"Error generating report: {e}")
+        return jsonify({'error': str(e)})
+
 @socketio.on('request_update')
 def handle_update_request():
-    """Handle real-time update requests."""
+    """Handle real-time update requests with enhanced performance."""
     try:
-        # Send current status
-        emit('status_update', get_status().get_json())
+        # Batch all updates to reduce WebSocket overhead
+        update_data = {}
         
-        # Send latest metrics
-        if metrics_tracker:
-            latest_metrics = get_latest_metrics().get_json()
-            emit('metrics_update', latest_metrics)
+        # Get current status
+        try:
+            status_data = get_status().get_json()
+            update_data['status'] = status_data
+        except Exception as e:
+            logger.warning(f"Error getting status for WebSocket: {e}")
+            update_data['status'] = {'error': str(e)}
         
-        # Send latest results
-        if coordinator:
-            latest_results = get_latest_results().get_json()
-            emit('results_update', latest_results)
+        # Get latest metrics (only if training)
+        if state_manager and state_manager.is_training():
+            try:
+                if metrics_tracker:
+                    latest_metrics = get_latest_metrics().get_json()
+                    update_data['metrics'] = latest_metrics
+            except Exception as e:
+                logger.warning(f"Error getting metrics for WebSocket: {e}")
+                update_data['metrics'] = {'error': str(e)}
+            
+            # Get latest results (only if training)
+            try:
+                if coordinator:
+                    latest_results = get_latest_results().get_json()
+                    update_data['results'] = latest_results
+            except Exception as e:
+                logger.warning(f"Error getting results for WebSocket: {e}")
+                update_data['results'] = {'error': str(e)}
+        
+        # Send batched update
+        emit('batch_update', update_data)
             
     except Exception as e:
         emit('error', {'message': str(e)})
 
 def background_updates():
-    """Send periodic updates to connected clients."""
+    """Send periodic updates to connected clients with enhanced performance."""
+    last_update_time = 0
+    update_interval = 3  # seconds
+    
     while True:
         try:
-            with app.app_context():
-                if state_manager and state_manager.is_training():
-                    socketio.emit('status_update', get_status().get_json())
-                    
-                    if metrics_tracker:
-                        latest_metrics = get_latest_metrics().get_json()
-                        socketio.emit('metrics_update', latest_metrics)
-                    
-                    if coordinator:
-                        latest_results = get_latest_results().get_json()
-                        socketio.emit('results_update', latest_results)
+            current_time = time.time()
             
-            time.sleep(5)  # Update every 5 seconds
+            # Only update if enough time has passed and we have active connections
+            if current_time - last_update_time >= update_interval:
+                with app.app_context():
+                    # Check if we have any connected clients
+                    if hasattr(socketio, 'server') and socketio.server:
+                        # Only send updates if training or if it's been a while
+                        should_update = (state_manager and state_manager.is_training()) or \
+                                      (current_time - last_update_time >= 10)
+                        
+                        if should_update:
+                            try:
+                                # Batch updates for efficiency
+                                update_data = {}
+                                
+                                # Always include status
+                                update_data['status'] = get_status().get_json()
+                                
+                                # Include metrics and results only if training
+                                if state_manager and state_manager.is_training():
+                                    if metrics_tracker:
+                                        update_data['metrics'] = get_latest_metrics().get_json()
+                                    
+                                    if coordinator:
+                                        update_data['results'] = get_latest_results().get_json()
+                                
+                                # Send batched update
+                                socketio.emit('batch_update', update_data)
+                                last_update_time = current_time
+                                
+                                # Garbage collection to prevent memory leaks
+                                if current_time % 30 == 0:  # Every 30 seconds
+                                    gc.collect()
+                                    
+                            except Exception as e:
+                                logger.warning(f"Error in batch update: {e}")
+            
+            # Adaptive sleep based on training status
+            if state_manager and state_manager.is_training():
+                time.sleep(2)  # More frequent updates during training
+            else:
+                time.sleep(5)  # Less frequent when idle
             
         except Exception as e:
             logger.error(f"Error in background updates: {e}")
