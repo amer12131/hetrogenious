@@ -118,6 +118,11 @@ def metrics():
     """Metrics and analytics page."""
     return render_template('metrics.html')
 
+@app.route('/local_models')
+def local_models():
+    """Local models detailed view page."""
+    return render_template('local_models.html')
+
 @app.route('/api/status')
 def get_status():
     """Get system status."""
@@ -493,6 +498,35 @@ def start_training():
                     metrics_tracker, plot_generator
                 )
                 
+                # Trigger plot regeneration after training completes
+                if success:
+                    try:
+                        logger.info("Training completed, triggering plot updates...")
+                        # Generate final plots and emit to connected clients
+                        final_plots = {}
+                        plot_types = ['metrics_comparison', 'improvements', 'training_progress', 'model_accuracies']
+                        
+                        for plot_type in plot_types:
+                            try:
+                                if plot_type == 'metrics_comparison':
+                                    final_plots[plot_type] = _generate_metrics_comparison_plot().get_json()
+                                elif plot_type == 'improvements':
+                                    final_plots[plot_type] = _generate_improvements_plot().get_json()
+                                elif plot_type == 'training_progress':
+                                    final_plots[plot_type] = _generate_training_progress_plot().get_json()
+                                elif plot_type == 'model_accuracies':
+                                    final_plots[plot_type] = _generate_model_accuracies_plot().get_json()
+                            except Exception as e:
+                                logger.warning(f"Error generating final {plot_type} plot: {e}")
+                        
+                        # Emit final plots to all connected clients
+                        if final_plots:
+                            socketio.emit('training_completed_plots', final_plots)
+                            logger.info("Final training plots sent to clients")
+                            
+                    except Exception as e:
+                        logger.warning(f"Error generating final plots: {e}")
+                
                 if not success:
                     logger.error("Federated training failed")
                 else:
@@ -642,179 +676,410 @@ def get_all_results():
 
 @app.route('/api/plots/<plot_type>')
 def get_plot(plot_type):
-    """Get specific plot data."""
+    """Get specific plot data with enhanced error handling and data validation."""
     global plot_generator, metrics_tracker
     
     if not plot_generator or not metrics_tracker:
         return jsonify({'error': 'Visualization components not initialized'})
     
     try:
+        # Validate plot type
+        valid_plot_types = ['metrics_comparison', 'improvements', 'training_progress', 'model_accuracies', 'local_model_details']
+        if plot_type not in valid_plot_types:
+            return jsonify({'error': f'Unknown plot type: {plot_type}. Valid types: {valid_plot_types}'})
+        
         if plot_type == 'metrics_comparison':
-            # Get metrics data
-            global_df = metrics_tracker.get_metrics_dataframe()
-            local_metrics = {}
-            
-            for model_name in LOCAL_MODELS.keys():
-                try:
-                    local_df = metrics_tracker.get_metrics_dataframe(model_name)
-                    if not local_df.empty:
-                        local_metrics[model_name] = {
-                            'accuracy': local_df['accuracy'].tolist(),
-                            'f1_score': local_df['f1_score'].tolist(),
-                            'precision': local_df['precision'].tolist(),
-                            'recall': local_df['recall'].tolist()
-                        }
-                    else:
-                        # Provide default data for empty models
-                        local_metrics[model_name] = {
-                            'accuracy': [0.0],
-                            'f1_score': [0.0],
-                            'precision': [0.0],
-                            'recall': [0.0]
-                        }
-                except Exception as e:
-                    logger.warning(f"Error getting metrics for {model_name}: {e}")
+            return _generate_metrics_comparison_plot()
+        
+        elif plot_type == 'improvements':
+            return _generate_improvements_plot()
+        
+        elif plot_type == 'training_progress':
+            return _generate_training_progress_plot()
+        
+        elif plot_type == 'model_accuracies':
+            return _generate_model_accuracies_plot()
+        
+        elif plot_type == 'local_model_details':
+            # Get specific model from query parameter
+            model_name = request.args.get('model', 'xgboost')
+            return _generate_local_model_details_plot(model_name)
+        
+        return jsonify({'error': f'Plot type {plot_type} not implemented'})
+        
+    except Exception as e:
+        logger.error(f"Error in get_plot for {plot_type}: {e}")
+        return jsonify({'error': f'Error generating plot: {str(e)}'})
+
+def _generate_metrics_comparison_plot():
+    """Generate metrics comparison plot with enhanced data handling."""
+    try:
+        # Get global metrics data
+        global_df = metrics_tracker.get_metrics_dataframe()
+        local_metrics = {}
+        
+        # Process local models data
+        for model_name in LOCAL_MODELS.keys():
+            try:
+                local_df = metrics_tracker.get_metrics_dataframe(model_name)
+                if not local_df.empty:
+                    local_metrics[model_name] = {}
+                    for metric in ['accuracy', 'f1_score', 'precision', 'recall']:
+                        if metric in local_df.columns:
+                            # Convert to list and handle NaN values
+                            values = local_df[metric].fillna(0.0).tolist()
+                            local_metrics[model_name][metric] = values
+                        else:
+                            local_metrics[model_name][metric] = [0.0]
+                else:
+                    # Provide default data for empty models
                     local_metrics[model_name] = {
                         'accuracy': [0.0],
                         'f1_score': [0.0],
                         'precision': [0.0],
                         'recall': [0.0]
                     }
-            
-            if not global_df.empty:
-                global_metrics = {
-                    'accuracy': global_df['accuracy'].tolist(),
-                    'f1_score': global_df['f1_score'].tolist(),
-                    'precision': global_df['precision'].tolist(),
-                    'recall': global_df['recall'].tolist()
-                }
-            else:
-                # Provide default global metrics
-                global_metrics = {
+            except Exception as e:
+                logger.warning(f"Error getting metrics for {model_name}: {e}")
+                local_metrics[model_name] = {
                     'accuracy': [0.0],
                     'f1_score': [0.0],
                     'precision': [0.0],
                     'recall': [0.0]
                 }
-                
-            fig = plot_generator.plot_comparison_chart(
-                global_metrics, local_metrics, 'accuracy'
-            )
-            return jsonify({'plot_json': fig.to_json()})
         
-        elif plot_type == 'improvements':
-            # Get improvement data
-            try:
-                global_improvements = metrics_tracker.calculate_improvement_percentage()
-                if not global_improvements:
-                    global_improvements = {
-                        'accuracy_improvement': 0.0,
-                        'f1_score_improvement': 0.0,
-                        'precision_improvement': 0.0,
-                        'recall_improvement': 0.0
-                    }
-            except Exception as e:
-                logger.warning(f"Error calculating global improvements: {e}")
-                global_improvements = {
+        # Process global metrics data
+        if not global_df.empty:
+            global_metrics = {}
+            for metric in ['accuracy', 'f1_score', 'precision', 'recall']:
+                if metric in global_df.columns:
+                    # Convert to list and handle NaN values
+                    values = global_df[metric].fillna(0.0).tolist()
+                    global_metrics[metric] = values
+                else:
+                    global_metrics[metric] = [0.0]
+        else:
+            # Provide default global metrics
+            global_metrics = {
+                'accuracy': [0.0],
+                'f1_score': [0.0],
+                'precision': [0.0],
+                'recall': [0.0]
+            }
+        
+        # Generate plot
+        fig = plot_generator.plot_comparison_chart(
+            global_metrics, local_metrics, 'accuracy'
+        )
+        
+        return jsonify({
+            'plot_json': fig.to_json(),
+            'data_points': {
+                'global': len(global_metrics.get('accuracy', [])),
+                'local': {k: len(v.get('accuracy', [])) for k, v in local_metrics.items()}
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Error generating metrics comparison plot: {e}")
+        return jsonify({'error': f'Error creating metrics comparison: {str(e)}'})
+
+def _generate_improvements_plot():
+    """Generate improvements plot with better calculations."""
+    try:
+        improvements = {}
+        
+        # Get global improvements
+        try:
+            global_improvements = metrics_tracker.calculate_improvement_percentage()
+            if global_improvements:
+                improvements['global'] = global_improvements
+            else:
+                improvements['global'] = {
                     'accuracy_improvement': 0.0,
                     'f1_score_improvement': 0.0,
                     'precision_improvement': 0.0,
                     'recall_improvement': 0.0
                 }
-            
-            improvements = {'global': global_improvements}
-            
-            for model_name in LOCAL_MODELS.keys():
-                try:
-                    local_improvements = metrics_tracker.calculate_improvement_percentage(model_name)
-                    if not local_improvements:
-                        local_improvements = {
-                            'accuracy_improvement': 0.0,
-                            'f1_score_improvement': 0.0,
-                            'precision_improvement': 0.0,
-                            'recall_improvement': 0.0
-                        }
+        except Exception as e:
+            logger.warning(f"Error calculating global improvements: {e}")
+            improvements['global'] = {
+                'accuracy_improvement': 0.0,
+                'f1_score_improvement': 0.0,
+                'precision_improvement': 0.0,
+                'recall_improvement': 0.0
+            }
+        
+        # Get local model improvements
+        for model_name in LOCAL_MODELS.keys():
+            try:
+                local_improvements = metrics_tracker.calculate_improvement_percentage(model_name)
+                if local_improvements:
                     improvements[model_name] = local_improvements
-                except Exception as e:
-                    logger.warning(f"Error calculating improvements for {model_name}: {e}")
+                else:
                     improvements[model_name] = {
                         'accuracy_improvement': 0.0,
                         'f1_score_improvement': 0.0,
                         'precision_improvement': 0.0,
                         'recall_improvement': 0.0
                     }
-            
-            fig = plot_generator.plot_improvement_percentages(improvements)
-            return jsonify({'plot_json': fig.to_json()})
-        
-        elif plot_type == 'training_progress':
-            # Get training progress data
-            global_df = metrics_tracker.get_metrics_dataframe()
-            
-            if not global_df.empty:
-                training_data = {
-                    'loss': global_df['loss'].tolist() if 'loss' in global_df.columns else [1.0],
-                    'training_time': global_df['training_time'].tolist() if 'training_time' in global_df.columns else [0.0]
-                }
-            else:
-                # Provide default training data
-                training_data = {
-                    'loss': [1.0],
-                    'training_time': [0.0]
-                }
-                
-            fig = plot_generator.plot_training_progress(training_data)
-            return jsonify({'plot_json': fig.to_json()})
-        
-        elif plot_type == 'model_accuracies':
-            # Create a simple bar chart of latest model accuracies
-            try:
-                latest_metrics = get_latest_metrics().get_json()
-                
-                model_names = []
-                accuracies = []
-                
-                # Global model
-                if 'global' in latest_metrics and 'accuracy' in latest_metrics['global']:
-                    model_names.append('Global MLP')
-                    accuracies.append(latest_metrics['global']['accuracy'])
-                
-                # Local models
-                if 'local' in latest_metrics:
-                    for model_name, metrics in latest_metrics['local'].items():
-                        if 'accuracy' in metrics:
-                            model_names.append(model_name.replace('_', ' ').title())
-                            accuracies.append(metrics['accuracy'])
-                
-                # Create simple bar chart
-                import plotly.graph_objs as go
-                fig = go.Figure(data=[
-                    go.Bar(
-                        x=model_names,
-                        y=accuracies,
-                        marker_color=['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728'][:len(model_names)]
-                    )
-                ])
-                
-                fig.update_layout(
-                    title='Latest Model Accuracies',
-                    xaxis_title='Model',
-                    yaxis_title='Accuracy',
-                    template="plotly_white",
-                    height=400
-                )
-                
-                return jsonify({'plot_json': fig.to_json()})
-                
             except Exception as e:
-                logger.error(f"Error creating model accuracies plot: {e}")
-                return jsonify({'error': f'Error creating plot: {str(e)}'})
+                logger.warning(f"Error calculating improvements for {model_name}: {e}")
+                improvements[model_name] = {
+                    'accuracy_improvement': 0.0,
+                    'f1_score_improvement': 0.0,
+                    'precision_improvement': 0.0,
+                    'recall_improvement': 0.0
+                }
         
-        return jsonify({'error': f'Unknown plot type: {plot_type}'})
+        # Generate plot
+        fig = plot_generator.plot_improvement_percentages(improvements)
+        
+        return jsonify({
+            'plot_json': fig.to_json(),
+            'improvements_data': improvements
+        })
         
     except Exception as e:
-        logger.error(f"Error in get_plot for {plot_type}: {e}")
-        return jsonify({'error': f'Error generating plot: {str(e)}'})
+        logger.error(f"Error generating improvements plot: {e}")
+        return jsonify({'error': f'Error creating improvements plot: {str(e)}'})
+
+def _generate_training_progress_plot():
+    """Generate training progress plot with dual y-axes."""
+    try:
+        # Get training progress data
+        global_df = metrics_tracker.get_metrics_dataframe()
+        
+        training_data = {}
+        if not global_df.empty:
+            # Handle loss data
+            if 'loss' in global_df.columns:
+                loss_values = global_df['loss'].fillna(1.0).tolist()
+                training_data['loss'] = loss_values
+            else:
+                training_data['loss'] = [1.0]
+            
+            # Handle training time data
+            if 'training_time' in global_df.columns:
+                time_values = global_df['training_time'].fillna(0.0).tolist()
+                training_data['training_time'] = time_values
+            else:
+                training_data['training_time'] = [0.0]
+            
+            # Add accuracy for dual y-axis
+            if 'accuracy' in global_df.columns:
+                accuracy_values = global_df['accuracy'].fillna(0.0).tolist()
+                training_data['accuracy'] = accuracy_values
+            else:
+                training_data['accuracy'] = [0.0]
+        else:
+            # Provide default training data
+            training_data = {
+                'loss': [1.0],
+                'training_time': [0.0],
+                'accuracy': [0.0]
+            }
+        
+        # Generate enhanced training progress plot with dual y-axes
+        fig = _create_enhanced_training_progress_plot(training_data)
+        
+        return jsonify({
+            'plot_json': fig.to_json(),
+            'training_rounds': len(training_data.get('loss', []))
+        })
+        
+    except Exception as e:
+        logger.error(f"Error generating training progress plot: {e}")
+        return jsonify({'error': f'Error creating training progress plot: {str(e)}'})
+
+def _generate_model_accuracies_plot():
+    """Generate model accuracies plot with better styling."""
+    try:
+        latest_metrics = get_latest_metrics().get_json()
+        
+        model_names = []
+        accuracies = []
+        colors = []
+        
+        # Global model
+        if 'global' in latest_metrics and 'accuracy' in latest_metrics['global']:
+            model_names.append('Global MLP')
+            accuracies.append(latest_metrics['global']['accuracy'])
+            colors.append('#e74c3c')  # Red for global
+        
+        # Local models with specific colors
+        model_colors = {
+            'xgboost': '#3498db',      # Blue
+            'random_forest': '#2ecc71', # Green
+            'catboost': '#f39c12'       # Orange
+        }
+        
+        if 'local' in latest_metrics:
+            for model_name, metrics in latest_metrics['local'].items():
+                if 'accuracy' in metrics:
+                    display_name = model_name.replace('_', ' ').title()
+                    model_names.append(display_name)
+                    accuracies.append(metrics['accuracy'])
+                    colors.append(model_colors.get(model_name, '#9b59b6'))  # Default purple
+        
+        # Create enhanced bar chart
+        import plotly.graph_objs as go
+        fig = go.Figure(data=[
+            go.Bar(
+                x=model_names,
+                y=accuracies,
+                marker_color=colors,
+                text=[f'{acc:.3f}' for acc in accuracies],
+                textposition='auto',
+                hovertemplate='<b>%{x}</b><br>Accuracy: %{y:.3f}<extra></extra>'
+            )
+        ])
+        
+        fig.update_layout(
+            title='Latest Model Accuracies Comparison',
+            xaxis_title='Model',
+            yaxis_title='Accuracy',
+            template="plotly_white",
+            height=450,
+            yaxis=dict(range=[0, 1]),
+            showlegend=False
+        )
+        
+        return jsonify({
+            'plot_json': fig.to_json(),
+            'model_count': len(model_names),
+            'best_model': model_names[accuracies.index(max(accuracies))] if accuracies else 'None'
+        })
+        
+    except Exception as e:
+        logger.error(f"Error creating model accuracies plot: {e}")
+        return jsonify({'error': f'Error creating model accuracies plot: {str(e)}'})
+
+def _generate_local_model_details_plot(model_name):
+    """Generate detailed plot for individual local model."""
+    try:
+        if model_name not in LOCAL_MODELS.keys():
+            return jsonify({'error': f'Model {model_name} not found. Available models: {list(LOCAL_MODELS.keys())}'})
+        
+        # Get model metrics history
+        local_df = metrics_tracker.get_metrics_dataframe(model_name)
+        
+        if local_df.empty:
+            return jsonify({'error': f'No training data available for {model_name}'})
+        
+        # Prepare metrics data
+        metrics_data = {}
+        for metric in ['accuracy', 'f1_score', 'precision', 'recall']:
+            if metric in local_df.columns:
+                metrics_data[metric] = local_df[metric].fillna(0.0).tolist()
+            else:
+                metrics_data[metric] = [0.0] * len(local_df)
+        
+        # Generate detailed model plot
+        fig = plot_generator.plot_metrics_over_rounds(
+            metrics_data, 
+            title=f"{model_name.replace('_', ' ').title()} Detailed Performance"
+        )
+        
+        # Calculate additional statistics
+        latest_metrics = local_df.iloc[-1] if not local_df.empty else {}
+        improvement = {}
+        if len(local_df) > 1:
+            first_metrics = local_df.iloc[0]
+            for metric in ['accuracy', 'f1_score', 'precision', 'recall']:
+                if metric in latest_metrics and metric in first_metrics:
+                    improvement[metric] = latest_metrics[metric] - first_metrics[metric]
+        
+        return jsonify({
+            'plot_json': fig.to_json(),
+            'model_name': model_name,
+            'training_rounds': len(local_df),
+            'latest_metrics': latest_metrics.to_dict() if not latest_metrics.empty else {},
+            'improvements': improvement
+        })
+        
+    except Exception as e:
+        logger.error(f"Error generating local model details for {model_name}: {e}")
+        return jsonify({'error': f'Error creating local model details: {str(e)}'})
+
+def _create_enhanced_training_progress_plot(training_data):
+    """Create enhanced training progress plot with dual y-axes."""
+    try:
+        from plotly.subplots import make_subplots
+        import plotly.graph_objs as go
+        
+        # Create subplots with secondary y-axis
+        fig = make_subplots(
+            rows=1, cols=2,
+            subplot_titles=('Loss & Accuracy Over Time', 'Training Time per Round'),
+            specs=[[{"secondary_y": True}, {"secondary_y": False}]]
+        )
+        
+        rounds = list(range(1, len(training_data.get('loss', [])) + 1))
+        
+        # Add loss trace (primary y-axis)
+        if 'loss' in training_data:
+            fig.add_trace(
+                go.Scatter(
+                    x=rounds,
+                    y=training_data['loss'],
+                    mode='lines+markers',
+                    name='Loss',
+                    line=dict(color='red', width=3),
+                    marker=dict(size=8)
+                ),
+                row=1, col=1, secondary_y=False
+            )
+        
+        # Add accuracy trace (secondary y-axis)
+        if 'accuracy' in training_data:
+            fig.add_trace(
+                go.Scatter(
+                    x=rounds,
+                    y=training_data['accuracy'],
+                    mode='lines+markers',
+                    name='Accuracy',
+                    line=dict(color='green', width=3),
+                    marker=dict(size=8)
+                ),
+                row=1, col=1, secondary_y=True
+            )
+        
+        # Add training time trace
+        if 'training_time' in training_data:
+            fig.add_trace(
+                go.Scatter(
+                    x=rounds,
+                    y=training_data['training_time'],
+                    mode='lines+markers',
+                    name='Training Time',
+                    line=dict(color='blue', width=3),
+                    marker=dict(size=8)
+                ),
+                row=1, col=2
+            )
+        
+        # Update layout
+        fig.update_layout(
+            title='Enhanced Training Progress',
+            height=500,
+            template="plotly_white",
+            legend=dict(x=0.02, y=0.98)
+        )
+        
+        # Update axes labels
+        fig.update_xaxes(title_text="Round", row=1, col=1)
+        fig.update_xaxes(title_text="Round", row=1, col=2)
+        fig.update_yaxes(title_text="Loss", row=1, col=1, secondary_y=False)
+        fig.update_yaxes(title_text="Accuracy", row=1, col=1, secondary_y=True)
+        fig.update_yaxes(title_text="Time (seconds)", row=1, col=2)
+        
+        return fig
+        
+    except Exception as e:
+        logger.error(f"Error creating enhanced training progress plot: {e}")
+        # Fallback to simple plot
+        return plot_generator.plot_training_progress(training_data)
 
 @socketio.on('connect')
 def handle_connect():
@@ -847,12 +1112,76 @@ def handle_update_request():
     except Exception as e:
         emit('error', {'message': str(e)})
 
+@socketio.on('request_plot_update')
+def handle_plot_update_request(data):
+    """Handle real-time plot update requests."""
+    try:
+        plot_type = data.get('plot_type', 'metrics_comparison')
+        
+        # Generate the requested plot
+        if plot_type == 'metrics_comparison':
+            plot_data = _generate_metrics_comparison_plot().get_json()
+        elif plot_type == 'improvements':
+            plot_data = _generate_improvements_plot().get_json()
+        elif plot_type == 'training_progress':
+            plot_data = _generate_training_progress_plot().get_json()
+        elif plot_type == 'model_accuracies':
+            plot_data = _generate_model_accuracies_plot().get_json()
+        else:
+            plot_data = {'error': f'Unknown plot type: {plot_type}'}
+        
+        # Emit the plot update
+        emit('plot_update', {
+            'plot_type': plot_type,
+            'data': plot_data
+        })
+        
+    except Exception as e:
+        emit('plot_error', {
+            'plot_type': data.get('plot_type', 'unknown'),
+            'error': str(e)
+        })
+
+@socketio.on('request_all_plots')
+def handle_all_plots_request():
+    """Handle request for all plot updates."""
+    try:
+        plots_data = {}
+        
+        # Generate all plot types
+        plot_types = ['metrics_comparison', 'improvements', 'training_progress', 'model_accuracies']
+        
+        for plot_type in plot_types:
+            try:
+                if plot_type == 'metrics_comparison':
+                    plots_data[plot_type] = _generate_metrics_comparison_plot().get_json()
+                elif plot_type == 'improvements':
+                    plots_data[plot_type] = _generate_improvements_plot().get_json()
+                elif plot_type == 'training_progress':
+                    plots_data[plot_type] = _generate_training_progress_plot().get_json()
+                elif plot_type == 'model_accuracies':
+                    plots_data[plot_type] = _generate_model_accuracies_plot().get_json()
+            except Exception as e:
+                plots_data[plot_type] = {'error': str(e)}
+        
+        # Emit all plots
+        emit('all_plots_update', plots_data)
+        
+    except Exception as e:
+        emit('plots_error', {'error': str(e)})
+
 def background_updates():
-    """Send periodic updates to connected clients."""
+    """Send periodic updates to connected clients with plot regeneration."""
+    last_plot_update = 0
+    plot_update_interval = 15  # Update plots every 15 seconds during training
+    
     while True:
         try:
             with app.app_context():
+                current_time = time.time()
+                
                 if state_manager and state_manager.is_training():
+                    # Send status and metrics updates
                     socketio.emit('status_update', get_status().get_json())
                     
                     if metrics_tracker:
@@ -862,6 +1191,33 @@ def background_updates():
                     if coordinator:
                         latest_results = get_latest_results().get_json()
                         socketio.emit('results_update', latest_results)
+                    
+                    # Send plot updates less frequently to avoid overwhelming the client
+                    if current_time - last_plot_update > plot_update_interval:
+                        try:
+                            # Generate and send key plots
+                            plots_data = {}
+                            
+                            # Only generate essential plots during training
+                            essential_plots = ['metrics_comparison', 'model_accuracies']
+                            
+                            for plot_type in essential_plots:
+                                try:
+                                    if plot_type == 'metrics_comparison':
+                                        plots_data[plot_type] = _generate_metrics_comparison_plot().get_json()
+                                    elif plot_type == 'model_accuracies':
+                                        plots_data[plot_type] = _generate_model_accuracies_plot().get_json()
+                                except Exception as e:
+                                    logger.warning(f"Error generating {plot_type} during background update: {e}")
+                                    plots_data[plot_type] = {'error': str(e)}
+                            
+                            if plots_data:
+                                socketio.emit('training_plots_update', plots_data)
+                                last_plot_update = current_time
+                                logger.debug("Sent training plots update to clients")
+                            
+                        except Exception as e:
+                            logger.warning(f"Error in background plot updates: {e}")
             
             time.sleep(5)  # Update every 5 seconds
             
@@ -1095,6 +1451,113 @@ def get_detailed_models_info():
         
     except Exception as e:
         logger.error(f"Error in get_detailed_models_info: {e}")
+        return jsonify({'error': str(e)})
+
+@app.route('/api/models/performance')
+def get_models_performance():
+    """Get detailed performance data for all models."""
+    global coordinator, metrics_tracker
+    
+    if not coordinator or not metrics_tracker:
+        return jsonify({'error': 'System not initialized'})
+    
+    try:
+        performance_data = {
+            'global_model': {},
+            'local_models': {},
+            'summary': {}
+        }
+        
+        # Get global model performance
+        try:
+            global_df = metrics_tracker.get_metrics_dataframe()
+            if not global_df.empty:
+                latest_global = global_df.iloc[-1].to_dict()
+                performance_data['global_model'] = {
+                    'latest_metrics': latest_global,
+                    'training_history': global_df.to_dict('records'),
+                    'total_rounds': len(global_df),
+                    'best_accuracy': float(global_df['accuracy'].max()) if 'accuracy' in global_df.columns else 0.0,
+                    'average_accuracy': float(global_df['accuracy'].mean()) if 'accuracy' in global_df.columns else 0.0,
+                    'improvement': metrics_tracker.calculate_improvement_percentage()
+                }
+            else:
+                performance_data['global_model'] = {
+                    'latest_metrics': {},
+                    'training_history': [],
+                    'total_rounds': 0,
+                    'best_accuracy': 0.0,
+                    'average_accuracy': 0.0,
+                    'improvement': {}
+                }
+        except Exception as e:
+            logger.warning(f"Error getting global model performance: {e}")
+            performance_data['global_model'] = {'error': str(e)}
+        
+        # Get local models performance
+        for model_name in LOCAL_MODELS.keys():
+            try:
+                local_df = metrics_tracker.get_metrics_dataframe(model_name)
+                if not local_df.empty:
+                    latest_local = local_df.iloc[-1].to_dict()
+                    performance_data['local_models'][model_name] = {
+                        'latest_metrics': latest_local,
+                        'training_history': local_df.to_dict('records'),
+                        'total_rounds': len(local_df),
+                        'best_accuracy': float(local_df['accuracy'].max()) if 'accuracy' in local_df.columns else 0.0,
+                        'average_accuracy': float(local_df['accuracy'].mean()) if 'accuracy' in local_df.columns else 0.0,
+                        'improvement': metrics_tracker.calculate_improvement_percentage(model_name),
+                        'model_type': LOCAL_MODELS[model_name]['type']
+                    }
+                else:
+                    performance_data['local_models'][model_name] = {
+                        'latest_metrics': {},
+                        'training_history': [],
+                        'total_rounds': 0,
+                        'best_accuracy': 0.0,
+                        'average_accuracy': 0.0,
+                        'improvement': {},
+                        'model_type': LOCAL_MODELS[model_name]['type']
+                    }
+            except Exception as e:
+                logger.warning(f"Error getting performance for {model_name}: {e}")
+                performance_data['local_models'][model_name] = {'error': str(e)}
+        
+        # Calculate summary statistics
+        try:
+            all_accuracies = []
+            
+            # Add global accuracy if available
+            if 'latest_metrics' in performance_data['global_model'] and 'accuracy' in performance_data['global_model']['latest_metrics']:
+                all_accuracies.append(performance_data['global_model']['latest_metrics']['accuracy'])
+            
+            # Add local model accuracies
+            for model_name, model_perf in performance_data['local_models'].items():
+                if 'latest_metrics' in model_perf and 'accuracy' in model_perf['latest_metrics']:
+                    all_accuracies.append(model_perf['latest_metrics']['accuracy'])
+            
+            if all_accuracies:
+                performance_data['summary'] = {
+                    'best_overall_accuracy': max(all_accuracies),
+                    'average_accuracy': sum(all_accuracies) / len(all_accuracies),
+                    'total_models': len(all_accuracies),
+                    'models_trained': len([acc for acc in all_accuracies if acc > 0])
+                }
+            else:
+                performance_data['summary'] = {
+                    'best_overall_accuracy': 0.0,
+                    'average_accuracy': 0.0,
+                    'total_models': 0,
+                    'models_trained': 0
+                }
+        except Exception as e:
+            logger.warning(f"Error calculating summary statistics: {e}")
+            performance_data['summary'] = {'error': str(e)}
+        
+        return jsonify(performance_data)
+        
+    except Exception as e:
+        logger.error(f"Error in get_models_performance: {e}")
         return jsonify({'error': str(e)})
 
 @app.route('/api/plots/regenerate_all')

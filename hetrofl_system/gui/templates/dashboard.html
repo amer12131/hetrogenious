@@ -4,23 +4,341 @@
 
 {% block extra_css %}
 <link rel="stylesheet" href="/static/css/custom.css">
+<style>
+    /* Enhanced dashboard-specific styles */
+    .dashboard-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 2rem 0;
+        margin-bottom: 2rem;
+        border-radius: 20px;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .dashboard-header::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grid" width="10" height="10" patternUnits="userSpaceOnUse"><path d="M 10 0 L 0 0 0 10" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="1"/></pattern></defs><rect width="100" height="100" fill="url(%23grid)"/></svg>');
+        opacity: 0.3;
+    }
+    
+    .dashboard-title {
+        position: relative;
+        z-index: 1;
+        font-size: 2.5rem;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+    }
+    
+    .dashboard-subtitle {
+        position: relative;
+        z-index: 1;
+        opacity: 0.9;
+        font-size: 1.1rem;
+    }
+    
+    .plot-card {
+        background: rgba(255, 255, 255, 0.98);
+        backdrop-filter: blur(20px);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 25px;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        overflow: hidden;
+        position: relative;
+    }
+    
+    .plot-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 5px;
+        background: linear-gradient(90deg, #667eea, #764ba2, #4facfe, #00f2fe);
+        opacity: 0;
+        transition: opacity 0.3s ease;
+    }
+    
+    .plot-card:hover::before {
+        opacity: 1;
+    }
+    
+    .plot-card:hover {
+        transform: translateY(-15px) scale(1.02);
+        box-shadow: 0 30px 60px rgba(0, 0, 0, 0.2);
+    }
+    
+    .plot-header {
+        background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(79, 172, 254, 0.1));
+        padding: 1.5rem;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    }
+    
+    .plot-title {
+        font-size: 1.3rem;
+        font-weight: 600;
+        color: #2c3e50;
+        margin: 0;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    
+    .plot-controls {
+        display: flex;
+        gap: 8px;
+    }
+    
+    .plot-btn {
+        background: rgba(102, 126, 234, 0.1);
+        border: 1px solid rgba(102, 126, 234, 0.2);
+        color: #667eea;
+        border-radius: 12px;
+        padding: 8px 12px;
+        font-size: 0.85rem;
+        transition: all 0.3s ease;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+    }
+    
+    .plot-btn:hover {
+        background: #667eea;
+        color: white;
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+    }
+    
+    .enhanced-tabs {
+        display: flex;
+        background: rgba(102, 126, 234, 0.05);
+        border-radius: 15px;
+        padding: 5px;
+        margin-bottom: 20px;
+        gap: 5px;
+    }
+    
+    .enhanced-tab {
+        flex: 1;
+        padding: 12px 20px;
+        text-align: center;
+        border-radius: 12px;
+        cursor: pointer;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        font-weight: 500;
+        color: #667eea;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .enhanced-tab::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+        transition: left 0.5s;
+    }
+    
+    .enhanced-tab:hover::before {
+        left: 100%;
+    }
+    
+    .enhanced-tab.active {
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        color: white;
+        box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+        transform: translateY(-2px);
+    }
+    
+    .plot-loading {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 400px;
+        color: #667eea;
+    }
+    
+    .loading-spinner-enhanced {
+        width: 60px;
+        height: 60px;
+        border: 4px solid rgba(102, 126, 234, 0.1);
+        border-radius: 50%;
+        border-top-color: #667eea;
+        animation: spin 1s linear infinite;
+        margin-bottom: 20px;
+    }
+    
+    .plot-error-enhanced {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 400px;
+        background: linear-gradient(135deg, rgba(231, 76, 60, 0.05), rgba(236, 112, 99, 0.05));
+        border: 2px dashed rgba(231, 76, 60, 0.2);
+        border-radius: 15px;
+        color: #e74c3c;
+        text-align: center;
+        padding: 40px;
+    }
+    
+    .training-controls-card {
+        background: linear-gradient(135deg, rgba(46, 204, 113, 0.05), rgba(39, 174, 96, 0.05));
+        border: 1px solid rgba(46, 204, 113, 0.1);
+    }
+    
+    .control-group {
+        background: rgba(255, 255, 255, 0.8);
+        border-radius: 15px;
+        padding: 20px;
+        margin-bottom: 20px;
+        border: 1px solid rgba(0, 0, 0, 0.05);
+    }
+    
+    .enhanced-progress {
+        height: 15px;
+        border-radius: 10px;
+        background: linear-gradient(90deg, #f8f9fa, #e9ecef);
+        overflow: hidden;
+        position: relative;
+        box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+    
+    .enhanced-progress-bar {
+        height: 100%;
+        border-radius: 10px;
+        background: linear-gradient(90deg, #667eea, #764ba2);
+        position: relative;
+        overflow: hidden;
+        transition: width 0.6s ease;
+    }
+    
+    .enhanced-progress-bar::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        right: 0;
+        background: linear-gradient(45deg, rgba(255,255,255,0.2) 25%, transparent 25%, transparent 50%, rgba(255,255,255,0.2) 50%, rgba(255,255,255,0.2) 75%, transparent 75%, transparent);
+        background-size: 30px 30px;
+        animation: shimmer 2s linear infinite;
+    }
+    
+    @keyframes shimmer {
+        0% { background-position: -30px 0; }
+        100% { background-position: 30px 0; }
+    }
+    
+    .status-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 16px;
+        border-radius: 20px;
+        font-size: 0.9rem;
+        font-weight: 500;
+    }
+    
+    .status-ready {
+        background: linear-gradient(135deg, rgba(46, 204, 113, 0.1), rgba(39, 174, 96, 0.1));
+        color: #27ae60;
+        border: 1px solid rgba(46, 204, 113, 0.2);
+    }
+    
+    .status-training {
+        background: linear-gradient(135deg, rgba(243, 156, 18, 0.1), rgba(230, 126, 34, 0.1));
+        color: #f39c12;
+        border: 1px solid rgba(243, 156, 18, 0.2);
+    }
+    
+    .status-error {
+        background: linear-gradient(135deg, rgba(231, 76, 60, 0.1), rgba(236, 112, 99, 0.1));
+        color: #e74c3c;
+        border: 1px solid rgba(231, 76, 60, 0.2);
+    }
+    
+    .toast-container {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 10000;
+    }
+    
+    .enhanced-toast {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(20px);
+        border: none;
+        border-radius: 15px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        margin-bottom: 10px;
+        overflow: hidden;
+        animation: slideInRight 0.5s ease-out;
+    }
+    
+    @keyframes slideInRight {
+        from {
+            opacity: 0;
+            transform: translateX(100%);
+        }
+        to {
+            opacity: 1;
+            transform: translateX(0);
+        }
+    }
+</style>
 {% endblock %}
 
 {% block content %}
+<!-- Toast Container -->
+<div id="toast-container" class="toast-container"></div>
+
+<!-- Alert Container -->
 <div id="alert-container"></div>
 
+<!-- Dashboard Header -->
+<div class="dashboard-header text-center">
+    <div class="container">
+        <h1 class="dashboard-title">
+            <i class="fas fa-network-wired me-3"></i>
+            HETROFL Dashboard
+        </h1>
+        <p class="dashboard-subtitle">
+            Real-time Heterogeneous Federated Learning System Monitoring
+        </p>
+        <div class="d-flex justify-content-center align-items-center mt-3">
+            <div class="live-indicator" id="live-indicator">
+                <div class="live-dot"></div>
+                <span>Live Updates Active</span>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- System Overview -->
-<div class="row mt-3">
+<div class="row mb-4">
     <div class="col-12">
-        <div class="card">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <h5 class="mb-0">
-                    <i class="fas fa-tachometer-alt me-2"></i>
+        <div class="card plot-card">
+            <div class="plot-header">
+                <h5 class="plot-title">
+                    <i class="fas fa-tachometer-alt"></i>
                     System Overview
                 </h5>
-                <div class="live-indicator" id="live-indicator">
-                    <div class="live-dot"></div>
-                    <span>Live Updates</span>
+                <div class="plot-controls">
+                    <button class="plot-btn" onclick="refreshSystemMetrics()">
+                        <i class="fas fa-sync-alt"></i>
+                        Refresh
+                    </button>
                 </div>
             </div>
             <div class="card-body">
@@ -68,51 +386,115 @@
 </div>
 
 <!-- Main Content -->
-<div class="row mt-4">
+<div class="row">
     <!-- Live Performance Chart -->
     <div class="col-lg-8">
-        <div class="card">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <h5 class="mb-0">
-                    <i class="fas fa-chart-line me-2"></i>
+        <div class="card plot-card">
+            <div class="plot-header">
+                <h5 class="plot-title">
+                    <i class="fas fa-chart-line"></i>
                     Live Performance Tracking
                 </h5>
-                <div>
-                    <button class="btn btn-sm btn-outline-primary" onclick="regeneratePlot('accuracy-chart')">
-                        <i class="fas fa-sync-alt me-1"></i>
-                        Refresh
+                <div class="plot-controls">
+                    <button class="plot-btn" onclick="refreshAllPlots()">
+                        <i class="fas fa-sync-alt"></i>
+                        Refresh All
+                    </button>
+                    <button class="plot-btn" onclick="exportCurrentPlot()">
+                        <i class="fas fa-download"></i>
+                        Export
+                    </button>
+                    <button class="plot-btn" onclick="toggleFullscreen('performance-section')">
+                        <i class="fas fa-expand"></i>
+                        Fullscreen
                     </button>
                 </div>
             </div>
-            <div class="card-body">
-                <ul class="custom-tabs">
-                    <li class="custom-tab active" onclick="switchTab('accuracy-tab', 'performance-tabs')">Accuracy</li>
-                    <li class="custom-tab" onclick="switchTab('f1-tab', 'performance-tabs')">F1 Score</li>
-                    <li class="custom-tab" onclick="switchTab('radar-tab', 'performance-tabs')">Radar</li>
-                    <li class="custom-tab" onclick="switchTab('training-tab', 'performance-tabs')">Training</li>
-                </ul>
+            <div class="card-body" id="performance-section">
+                <div class="enhanced-tabs">
+                    <div class="enhanced-tab active" onclick="switchEnhancedTab('accuracy-tab', this)">
+                        <i class="fas fa-bullseye me-2"></i>
+                        Accuracy
+                    </div>
+                    <div class="enhanced-tab" onclick="switchEnhancedTab('f1-tab', this)">
+                        <i class="fas fa-chart-bar me-2"></i>
+                        F1 Score
+                    </div>
+                    <div class="enhanced-tab" onclick="switchEnhancedTab('radar-tab', this)">
+                        <i class="fas fa-chart-pie me-2"></i>
+                        Radar
+                    </div>
+                    <div class="enhanced-tab" onclick="switchEnhancedTab('training-tab', this)">
+                        <i class="fas fa-chart-line me-2"></i>
+                        Training
+                    </div>
+                </div>
                 
                 <div id="accuracy-tab" class="tab-content active">
-                    <div class="plot-container">
-                        <div id="accuracy-chart" style="height: 400px;"></div>
+                    <div class="plot-loading" id="accuracy-loading">
+                        <div class="loading-spinner-enhanced"></div>
+                        <p>Loading accuracy comparison...</p>
+                    </div>
+                    <div id="accuracy-chart" style="height: 450px; display: none;"></div>
+                    <div id="accuracy-error" class="plot-error-enhanced" style="display: none;">
+                        <i class="fas fa-exclamation-triangle fa-3x mb-3"></i>
+                        <h5>Error Loading Accuracy Chart</h5>
+                        <p>Unable to load accuracy comparison data.</p>
+                        <button class="plot-btn" onclick="retryPlot('accuracy')">
+                            <i class="fas fa-redo"></i>
+                            Retry
+                        </button>
                     </div>
                 </div>
                 
                 <div id="f1-tab" class="tab-content">
-                    <div class="plot-container">
-                        <div id="f1-chart" style="height: 400px;"></div>
+                    <div class="plot-loading" id="f1-loading">
+                        <div class="loading-spinner-enhanced"></div>
+                        <p>Loading F1 score comparison...</p>
+                    </div>
+                    <div id="f1-chart" style="height: 450px; display: none;"></div>
+                    <div id="f1-error" class="plot-error-enhanced" style="display: none;">
+                        <i class="fas fa-exclamation-triangle fa-3x mb-3"></i>
+                        <h5>Error Loading F1 Score Chart</h5>
+                        <p>Unable to load F1 score comparison data.</p>
+                        <button class="plot-btn" onclick="retryPlot('f1')">
+                            <i class="fas fa-redo"></i>
+                            Retry
+                        </button>
                     </div>
                 </div>
                 
                 <div id="radar-tab" class="tab-content">
-                    <div class="plot-container">
-                        <div id="radar-chart" style="height: 400px;"></div>
+                    <div class="plot-loading" id="radar-loading">
+                        <div class="loading-spinner-enhanced"></div>
+                        <p>Loading radar comparison...</p>
+                    </div>
+                    <div id="radar-chart" style="height: 450px; display: none;"></div>
+                    <div id="radar-error" class="plot-error-enhanced" style="display: none;">
+                        <i class="fas fa-exclamation-triangle fa-3x mb-3"></i>
+                        <h5>Error Loading Radar Chart</h5>
+                        <p>Unable to load radar comparison data.</p>
+                        <button class="plot-btn" onclick="retryPlot('radar')">
+                            <i class="fas fa-redo"></i>
+                            Retry
+                        </button>
                     </div>
                 </div>
                 
                 <div id="training-tab" class="tab-content">
-                    <div class="plot-container">
-                        <div id="training-chart" style="height: 400px;"></div>
+                    <div class="plot-loading" id="training-loading">
+                        <div class="loading-spinner-enhanced"></div>
+                        <p>Loading training progress...</p>
+                    </div>
+                    <div id="training-chart" style="height: 450px; display: none;"></div>
+                    <div id="training-error" class="plot-error-enhanced" style="display: none;">
+                        <i class="fas fa-exclamation-triangle fa-3x mb-3"></i>
+                        <h5>Error Loading Training Chart</h5>
+                        <p>Unable to load training progress data.</p>
+                        <button class="plot-btn" onclick="retryPlot('training')">
+                            <i class="fas fa-redo"></i>
+                            Retry
+                        </button>
                     </div>
                 </div>
             </div>
@@ -121,63 +503,97 @@
     
     <!-- Training Controls -->
     <div class="col-lg-4">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="mb-0">
-                    <i class="fas fa-play me-2"></i>
+        <div class="card plot-card training-controls-card">
+            <div class="plot-header">
+                <h5 class="plot-title">
+                    <i class="fas fa-play"></i>
                     Training Controls
                 </h5>
+                <div class="plot-controls">
+                    <button class="plot-btn" onclick="resetTrainingSettings()">
+                        <i class="fas fa-undo"></i>
+                        Reset
+                    </button>
+                </div>
             </div>
             <div class="card-body">
-                <div class="mb-3">
-                    <label for="sample-size" class="form-label">Sample Size</label>
+                <div class="control-group">
+                    <label for="sample-size" class="form-label fw-bold">
+                        <i class="fas fa-database me-2"></i>Sample Size
+                    </label>
                     <div class="input-group">
                         <input type="number" class="form-control" id="sample-size" value="50000" min="1000" max="1000000">
                         <span class="input-group-text">samples</span>
                     </div>
+                    <small class="text-muted">Number of data samples for training</small>
                 </div>
 
-                <div class="mb-3">
-                    <label for="max-rounds" class="form-label">Max Rounds</label>
+                <div class="control-group">
+                    <label for="max-rounds-input" class="form-label fw-bold">
+                        <i class="fas fa-repeat me-2"></i>Max Rounds
+                    </label>
                     <div class="input-group">
                         <input type="number" class="form-control" id="max-rounds-input" value="50" min="1" max="1000">
                         <span class="input-group-text">rounds</span>
                     </div>
+                    <small class="text-muted">Maximum federated learning rounds</small>
                 </div>
                 
-                <div class="mb-3">
-                    <label class="form-label">Training Progress</label>
-                    <div class="progress mb-2" style="height: 10px;">
-                        <div class="progress-bar" id="training-progress" role="progressbar" style="width: 0%"></div>
+                <div class="control-group">
+                    <label class="form-label fw-bold">
+                        <i class="fas fa-chart-line me-2"></i>Training Progress
+                    </label>
+                    <div class="enhanced-progress mb-2">
+                        <div class="enhanced-progress-bar" id="training-progress" style="width: 0%"></div>
                     </div>
-                    <small class="text-muted" id="progress-text">Ready to start</small>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <small class="text-muted" id="progress-text">Ready to start</small>
+                        <span class="status-badge status-ready" id="training-status-badge">
+                            <i class="fas fa-circle"></i>
+                            Ready
+                        </span>
+                    </div>
                 </div>
                 
-                <div class="d-grid gap-2">
-                    <button class="btn btn-success" id="start-training-btn" onclick="startTraining()">
+                <div class="d-grid gap-3">
+                    <button class="btn btn-success btn-lg" id="start-training-btn" onclick="startTraining()">
                         <i class="fas fa-play me-2"></i>Start Training
                     </button>
-                    <button class="btn btn-danger" id="stop-training-btn" onclick="stopTraining()" disabled>
+                    <button class="btn btn-danger btn-lg" id="stop-training-btn" onclick="stopTraining()" disabled>
                         <i class="fas fa-stop me-2"></i>Stop Training
                     </button>
                 </div>
             </div>
         </div>
         
-        <!-- Quick Stats -->
-        <div class="card mt-3">
-            <div class="card-header">
-                <h5 class="mb-0">
-                    <i class="fas fa-info-circle me-2"></i>
+        <!-- Model Improvements -->
+        <div class="card plot-card mt-4">
+            <div class="plot-header">
+                <h5 class="plot-title">
+                    <i class="fas fa-chart-bar"></i>
                     Model Improvements
                 </h5>
+                <div class="plot-controls">
+                    <button class="plot-btn" onclick="refreshImprovements()">
+                        <i class="fas fa-sync-alt"></i>
+                        Refresh
+                    </button>
+                </div>
             </div>
             <div class="card-body p-0">
-                <div id="improvements-chart" style="height: 270px;">
-                    <div class="loading-spinner">
-                        <div class="spinner mb-3"></div>
-                        <p>Loading improvement data...</p>
-                    </div>
+                <div class="plot-loading" id="improvements-loading">
+                    <div class="loading-spinner-enhanced"></div>
+                    <p>Loading improvement data...</p>
+                </div>
+                <div id="improvements-chart" style="height: 300px; display: none;"></div>
+                <div id="improvements-error" class="plot-error-enhanced" style="display: none;">
+                    <i class="fas fa-exclamation-triangle fa-2x mb-3"></i>
+                    <h6>Error Loading Improvements</h6>
+                    <p>Unable to load improvement data.</p>
+                    <button class="plot-btn" onclick="retryPlot('improvements')">
+                        <i class="fas fa-redo"></i>
+                        Retry
+                    </button>
                 </div>
             </div>
         </div>
@@ -185,29 +601,41 @@
 </div>
 
 <!-- Local Models Row -->
-<div class="row mt-4">
+<div class="row mt-5">
     <div class="col-12">
-        <div class="card">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <h5 class="mb-0">
-                    <i class="fas fa-brain me-2"></i>
+        <div class="card plot-card">
+            <div class="plot-header">
+                <h5 class="plot-title">
+                    <i class="fas fa-brain"></i>
                     Local Models Status
                 </h5>
-                <div>
-                    <button class="btn btn-sm btn-outline-primary" onclick="loadModelsData()">
-                        <i class="fas fa-sync-alt me-1"></i>
+                <div class="plot-controls">
+                    <button class="plot-btn" onclick="loadModelsData()">
+                        <i class="fas fa-sync-alt"></i>
                         Refresh
+                    </button>
+                    <button class="plot-btn" onclick="exportModelsReport()">
+                        <i class="fas fa-file-export"></i>
+                        Export Report
                     </button>
                 </div>
             </div>
             <div class="card-body">
-                <div class="row" id="local-models-cards">
-                    <div class="col-12 text-center">
-                        <div class="spinner-border" role="status">
-                            <span class="visually-hidden">Loading...</span>
-                        </div>
-                        <p class="mt-2">Loading models...</p>
-                    </div>
+                <div class="plot-loading" id="models-loading">
+                    <div class="loading-spinner-enhanced"></div>
+                    <p>Loading model information...</p>
+                </div>
+                <div class="row" id="local-models-cards" style="display: none;">
+                    <!-- Model cards will be populated here -->
+                </div>
+                <div id="models-error" class="plot-error-enhanced" style="display: none;">
+                    <i class="fas fa-exclamation-triangle fa-3x mb-3"></i>
+                    <h5>Error Loading Models</h5>
+                    <p>Unable to load local models information.</p>
+                    <button class="plot-btn" onclick="retryLoadModels()">
+                        <i class="fas fa-redo"></i>
+                        Retry
+                    </button>
                 </div>
             </div>
         </div>
@@ -218,28 +646,400 @@
 {% block extra_js %}
 <script src="/static/js/charts.js"></script>
 <script>
-    // Dashboard-specific variables
+    // Enhanced dashboard variables
     let metricsHistory = {global: [], local: {}};
     let activityLog = [];
     let latestMetrics = {global: {}, local: {}};
     let improvements = {global: {}, local: {}};
+    let currentActiveTab = 'accuracy-tab';
+    let plotUpdateInterval = null;
+    let isTraining = false;
     
-    // Initialize dashboard
+    // Initialize enhanced dashboard
     document.addEventListener('DOMContentLoaded', function() {
+        initializeEnhancedDashboard();
+        setupEnhancedSocket();
         loadInitialData();
-        setupTabSwitching();
-        setupSocket();
+        startPeriodicUpdates();
     });
+    
+    // Enhanced dashboard initialization
+    function initializeEnhancedDashboard() {
+        // Add enhanced animations
+        document.querySelectorAll('.plot-card').forEach((card, index) => {
+            card.style.animationDelay = `${index * 0.1}s`;
+            card.classList.add('fade-in');
+        });
+        
+        // Initialize tooltips for enhanced elements
+        initializeTooltips();
+        
+        // Setup keyboard shortcuts
+        setupKeyboardShortcuts();
+        
+        // Initialize fullscreen functionality
+        setupFullscreenHandlers();
+        
+        console.log('Enhanced dashboard initialized');
+    }
+    
+    // Enhanced tab switching
+    function switchEnhancedTab(tabId, tabElement) {
+        // Remove active class from all tabs
+        document.querySelectorAll('.enhanced-tab').forEach(tab => {
+            tab.classList.remove('active');
+        });
+        
+        // Hide all tab contents
+        document.querySelectorAll('.tab-content').forEach(content => {
+            content.classList.remove('active');
+        });
+        
+        // Activate selected tab
+        tabElement.classList.add('active');
+        document.getElementById(tabId).classList.add('active');
+        
+        currentActiveTab = tabId;
+        
+        // Load plot data for the active tab if not already loaded
+        loadPlotForTab(tabId);
+        
+        // Add smooth transition effect
+        const tabContent = document.getElementById(tabId);
+        tabContent.style.opacity = '0';
+        setTimeout(() => {
+            tabContent.style.opacity = '1';
+        }, 100);
+    }
+    
+    // Load plot data for specific tab
+    function loadPlotForTab(tabId) {
+        const plotType = tabId.replace('-tab', '');
+        const chartId = `${plotType}-chart`;
+        const loadingId = `${plotType}-loading`;
+        const errorId = `${plotType}-error`;
+        
+        // Show loading state
+        showPlotState(plotType, 'loading');
+        
+        // Fetch plot data based on type using the correct API format
+        let apiEndpoint = '';
+        switch(plotType) {
+            case 'accuracy':
+                apiEndpoint = '/api/plots/metrics_comparison';
+                break;
+            case 'f1':
+                apiEndpoint = '/api/plots/metrics_comparison';
+                break;
+            case 'radar':
+                apiEndpoint = '/api/plots/model_accuracies';
+                break;
+            case 'training':
+                apiEndpoint = '/api/plots/training_progress';
+                break;
+            case 'improvements':
+                apiEndpoint = '/api/plots/improvements';
+                break;
+            default:
+                showPlotState(plotType, 'error');
+                return;
+        }
+        
+        fetch(apiEndpoint)
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    showPlotState(plotType, 'error');
+                    showToast(`Error loading ${plotType} plot: ${data.error}`, 'error');
+                } else {
+                    showPlotState(plotType, 'chart');
+                    renderPlotData(plotType, data);
+                    showToast(`${plotType.charAt(0).toUpperCase() + plotType.slice(1)} plot loaded successfully`, 'success', 3000);
+                }
+            })
+            .catch(error => {
+                console.error(`Error loading ${plotType} plot:`, error);
+                showPlotState(plotType, 'error');
+                showToast(`Network error loading ${plotType} plot`, 'error');
+            });
+    }
+    
+    // Show different plot states (loading, chart, error)
+    function showPlotState(plotType, state) {
+        const loadingEl = document.getElementById(`${plotType}-loading`);
+        const chartEl = document.getElementById(`${plotType}-chart`);
+        const errorEl = document.getElementById(`${plotType}-error`);
+        
+        // Hide all states
+        if (loadingEl) loadingEl.style.display = 'none';
+        if (chartEl) chartEl.style.display = 'none';
+        if (errorEl) errorEl.style.display = 'none';
+        
+        // Show requested state
+        switch(state) {
+            case 'loading':
+                if (loadingEl) loadingEl.style.display = 'flex';
+                break;
+            case 'chart':
+                if (chartEl) chartEl.style.display = 'block';
+                break;
+            case 'error':
+                if (errorEl) errorEl.style.display = 'flex';
+                break;
+        }
+    }
+    
+    // Render plot data based on type
+    function renderPlotData(plotType, data) {
+        const chartId = `${plotType}-chart`;
+        
+        try {
+            switch(plotType) {
+                case 'accuracy':
+                    if (data.plot_json) {
+                        Plotly.newPlot(chartId, JSON.parse(data.plot_json).data, JSON.parse(data.plot_json).layout, PLOT_CONFIG);
+                    } else {
+                        createAccuracyComparisonChart(chartId, metricsHistory);
+                    }
+                    break;
+                case 'f1':
+                    createF1ScoreComparisonChart(chartId, metricsHistory);
+                    break;
+                case 'radar':
+                    createModelComparisonRadar(chartId, latestMetrics);
+                    break;
+                case 'training':
+                    createTrainingProgressChart(chartId, metricsHistory);
+                    break;
+                case 'improvements':
+                    if (data.plot_json) {
+                        Plotly.newPlot(chartId, JSON.parse(data.plot_json).data, JSON.parse(data.plot_json).layout, PLOT_CONFIG);
+                    } else {
+                        createImprovementChart(chartId, improvements);
+                    }
+                    break;
+            }
+        } catch (error) {
+            console.error(`Error rendering ${plotType} plot:`, error);
+            showPlotState(plotType, 'error');
+        }
+    }
+    
+    // Enhanced utility functions
+    function initializeTooltips() {
+        // Initialize Bootstrap tooltips for enhanced elements
+        const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+        tooltipTriggerList.map(function (tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl);
+        });
+    }
+    
+    function setupKeyboardShortcuts() {
+        document.addEventListener('keydown', function(e) {
+            // Ctrl+R: Refresh all plots
+            if (e.ctrlKey && e.key === 'r') {
+                e.preventDefault();
+                refreshAllPlots();
+            }
+            // Ctrl+T: Start/Stop training
+            if (e.ctrlKey && e.key === 't') {
+                e.preventDefault();
+                if (isTraining) {
+                    stopTraining();
+                } else {
+                    startTraining();
+                }
+            }
+            // Tab navigation: 1-4 for different plot tabs
+            if (e.key >= '1' && e.key <= '4') {
+                const tabs = ['accuracy-tab', 'f1-tab', 'radar-tab', 'training-tab'];
+                const tabIndex = parseInt(e.key) - 1;
+                if (tabs[tabIndex]) {
+                    const tabElement = document.querySelector(`[onclick*="${tabs[tabIndex]}"]`);
+                    if (tabElement) {
+                        switchEnhancedTab(tabs[tabIndex], tabElement);
+                    }
+                }
+            }
+        });
+    }
+    
+    function setupFullscreenHandlers() {
+        // Add fullscreen functionality
+        document.addEventListener('fullscreenchange', function() {
+            const fullscreenElement = document.fullscreenElement;
+            if (fullscreenElement) {
+                fullscreenElement.classList.add('fullscreen-active');
+            } else {
+                document.querySelectorAll('.fullscreen-active').forEach(el => {
+                    el.classList.remove('fullscreen-active');
+                });
+            }
+        });
+    }
+    
+    // Enhanced plot control functions
+    function refreshAllPlots() {
+        showToast('Refreshing all plots...', 'info', 2000);
+        
+        // Refresh current active tab
+        loadPlotForTab(currentActiveTab);
+        
+        // Refresh improvements chart
+        loadPlotForTab('improvements-tab');
+        
+        // Refresh system metrics
+        refreshSystemMetrics();
+        
+        // Refresh models data
+        loadModelsData();
+    }
+    
+    function exportCurrentPlot() {
+        const plotType = currentActiveTab.replace('-tab', '');
+        const chartElement = document.getElementById(`${plotType}-chart`);
+        
+        if (chartElement && chartElement.data) {
+            Plotly.downloadImage(chartElement, {
+                format: 'png',
+                width: 1200,
+                height: 800,
+                filename: `hetrofl_${plotType}_${new Date().toISOString().split('T')[0]}`
+            });
+            showToast(`${plotType.charAt(0).toUpperCase() + plotType.slice(1)} plot exported successfully`, 'success');
+        } else {
+            showToast('No plot data available to export', 'warning');
+        }
+    }
+    
+    function toggleFullscreen(elementId) {
+        const element = document.getElementById(elementId);
+        if (!element) return;
+        
+        if (!document.fullscreenElement) {
+            element.requestFullscreen().then(() => {
+                showToast('Entered fullscreen mode. Press ESC to exit.', 'info', 3000);
+            }).catch(err => {
+                showToast('Error entering fullscreen mode', 'error');
+            });
+        } else {
+            document.exitFullscreen();
+        }
+    }
+    
+    function retryPlot(plotType) {
+        showToast(`Retrying ${plotType} plot...`, 'info', 2000);
+        loadPlotForTab(`${plotType}-tab`);
+    }
+    
+    function refreshSystemMetrics() {
+        fetch('/api/status')
+            .then(response => response.json())
+            .then(data => {
+                updateDashboardMetrics(data);
+                showToast('System metrics refreshed', 'success', 2000);
+            })
+            .catch(error => {
+                console.error('Error refreshing system metrics:', error);
+                showToast('Error refreshing system metrics', 'error');
+            });
+    }
+    
+    function refreshImprovements() {
+        loadPlotForTab('improvements-tab');
+    }
+    
+    function resetTrainingSettings() {
+        document.getElementById('sample-size').value = '50000';
+        document.getElementById('max-rounds-input').value = '50';
+        showToast('Training settings reset to defaults', 'info', 2000);
+    }
+    
+    function exportModelsReport() {
+        fetch('/api/models/performance')
+            .then(response => response.json())
+            .then(data => {
+                const reportData = JSON.stringify(data, null, 2);
+                const blob = new Blob([reportData], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `hetrofl_models_report_${new Date().toISOString().split('T')[0]}.json`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                showToast('Models report exported successfully', 'success');
+            })
+            .catch(error => {
+                console.error('Error exporting models report:', error);
+                showToast('Error exporting models report', 'error');
+            });
+    }
+    
+    function retryLoadModels() {
+        loadModelsData();
+    }
+    
+    // Enhanced toast notification system
+    function showToast(message, type = 'info', duration = 5000) {
+        const toastContainer = document.getElementById('toast-container');
+        if (!toastContainer) return;
+        
+        const toastId = 'toast-' + Date.now();
+        const icons = {
+            success: 'check-circle',
+            error: 'exclamation-triangle',
+            warning: 'exclamation-circle',
+            info: 'info-circle'
+        };
+        
+        const toastHTML = `
+            <div id="${toastId}" class="enhanced-toast" role="alert">
+                <div class="toast-header">
+                    <i class="fas fa-${icons[type] || 'info-circle'} me-2 text-${type}"></i>
+                    <strong class="me-auto">${type.charAt(0).toUpperCase() + type.slice(1)}</strong>
+                    <button type="button" class="btn-close" onclick="removeToast('${toastId}')"></button>
+                </div>
+                <div class="toast-body">
+                    ${message}
+                </div>
+            </div>
+        `;
+        
+        toastContainer.insertAdjacentHTML('beforeend', toastHTML);
+        
+        // Auto-remove toast after duration
+        if (duration > 0) {
+            setTimeout(() => {
+                removeToast(toastId);
+            }, duration);
+        }
+    }
+    
+    function removeToast(toastId) {
+        const toast = document.getElementById(toastId);
+        if (toast) {
+            toast.style.animation = 'slideOutRight 0.3s ease-in';
+            setTimeout(() => {
+                toast.remove();
+            }, 300);
+        }
+    }
     
     // Load initial data
     function loadInitialData() {
+        // Show initial loading states
+        showPlotState('models', 'loading');
+        
         // Load metrics history
         fetch('/api/metrics/history')
             .then(response => response.json())
             .then(data => {
                 if (!data.error) {
                     metricsHistory = data;
-                    updateAllCharts();
+                    // Load initial accuracy plot
+                    loadPlotForTab('accuracy-tab');
                 }
             })
             .catch(error => console.error('Error loading metrics history:', error));
@@ -261,7 +1061,7 @@
             .then(data => {
                 if (!data.error) {
                     improvements = data;
-                    createImprovementChart('improvements-chart', improvements);
+                    loadPlotForTab('improvements-tab');
                 }
             })
             .catch(error => console.error('Error loading improvements:', error));
@@ -270,18 +1070,20 @@
         loadModelsData();
     }
     
-    // Setup WebSocket for real-time updates
-    function setupSocket() {
+    // Enhanced WebSocket setup
+    function setupEnhancedSocket() {
         const socket = io();
         
         socket.on('connect', function() {
             console.log('Connected to server');
             updateLiveIndicator(true);
+            showToast('Connected to HETROFL server', 'success', 3000);
         });
         
         socket.on('disconnect', function() {
             console.log('Disconnected from server');
             updateLiveIndicator(false);
+            showToast('Disconnected from server', 'error');
         });
         
         socket.on('metrics_update', function(data) {
@@ -289,28 +1091,28 @@
                 latestMetrics = data;
                 updateDashboardMetrics();
                 
-                // Fetch latest history
-                fetch('/api/metrics/history')
-                    .then(response => response.json())
-                    .then(historyData => {
-                        if (!historyData.error) {
-                            metricsHistory = historyData;
-                            updateAllCharts();
-                        }
-                    })
-                    .catch(error => console.error('Error updating metrics history:', error));
-                
-                // Fetch latest improvements
-                fetch('/api/metrics/improvements')
-                    .then(response => response.json())
-                    .then(improvementsData => {
-                        if (!improvementsData.error) {
-                            improvements = improvementsData;
-                            createImprovementChart('improvements-chart', improvements);
-                        }
-                    })
-                    .catch(error => console.error('Error updating improvements:', error));
+                // Update current active plot if it's metrics-related
+                if (currentActiveTab.includes('accuracy') || currentActiveTab.includes('f1') || currentActiveTab.includes('radar')) {
+                    loadPlotForTab(currentActiveTab);
+                }
             }
+        });
+        
+        socket.on('training_plots_update', function(data) {
+            // Handle real-time plot updates during training
+            if (data) {
+                Object.entries(data).forEach(([plotType, plotData]) => {
+                    if (!plotData.error) {
+                        renderPlotData(plotType, plotData);
+                    }
+                });
+            }
+        });
+        
+        socket.on('training_completed_plots', function(data) {
+            // Handle final plots when training completes
+            showToast('Training completed! Updating final plots...', 'success');
+            refreshAllPlots();
         });
     }
     
@@ -319,95 +1121,35 @@
         const indicator = document.getElementById('live-indicator');
         if (indicator) {
             if (isConnected) {
-                indicator.innerHTML = '<div class="live-dot"></div><span>Live Updates</span>';
+                indicator.innerHTML = '<div class="live-dot"></div><span>Live Updates Active</span>';
+                indicator.classList.remove('disconnected');
             } else {
                 indicator.innerHTML = '<div class="live-dot" style="background-color: #e74c3c;"></div><span>Disconnected</span>';
+                indicator.classList.add('disconnected');
             }
         }
     }
     
-    // Update all charts
-    function updateAllCharts() {
-        // If metrics history is empty or doesn't have enough data, fetch sample data
-        if (!metricsHistory.global || metricsHistory.global.length === 0) {
-            console.log("No real metrics history found, loading sample visualization data");
-            fetch('/api/metrics/history')
-                .then(response => response.json())
-                .then(data => {
-                    metricsHistory = data;
-                    createAccuracyComparisonChart('accuracy-chart', metricsHistory);
-                    createF1ScoreComparisonChart('f1-chart', metricsHistory);
-                    createModelComparisonRadar('radar-chart', latestMetrics);
-                    createTrainingProgressChart('training-chart', metricsHistory);
-                })
-                .catch(error => {
-                    console.error('Error loading sample metrics:', error);
-                    // Fallback to creating empty charts
-                    createEmptyCharts();
-                });
-        } else {
-            // We have data, create the charts
-            createAccuracyComparisonChart('accuracy-chart', metricsHistory);
-            createF1ScoreComparisonChart('f1-chart', metricsHistory);
-            createModelComparisonRadar('radar-chart', latestMetrics);
-            createTrainingProgressChart('training-chart', metricsHistory);
-        }
-    }
-    
-    // Create empty charts with placeholder data as fallback
-    function createEmptyCharts() {
-        // Create empty accuracy chart
-        const emptyLayout = {
-            title: 'No Data Available',
-            xaxis: { title: 'Training Round' },
-            yaxis: { title: 'Value' },
-            plot_bgcolor: COLORS.background,
-            paper_bgcolor: 'white',
-            height: 400
-        };
-        
-        const emptyTrace = [{
-            x: [0, 1, 2],
-            y: [0, 0, 0],
-            type: 'scatter',
-            mode: 'lines',
-            name: 'No Data',
-            line: { color: '#cccccc', dash: 'dash' }
-        }];
-        
-        Plotly.newPlot('accuracy-chart', emptyTrace, emptyLayout);
-        Plotly.newPlot('f1-chart', emptyTrace, emptyLayout);
-        Plotly.newPlot('training-chart', emptyTrace, emptyLayout);
-        
-        // Create empty radar chart
-        const emptyRadarTrace = [{
-            type: 'scatterpolar',
-            r: [0, 0, 0, 0],
-            theta: ['Accuracy', 'F1', 'Precision', 'Recall'],
-            fill: 'toself',
-            name: 'No Data'
-        }];
-        
-        const radarLayout = {
-            polar: {
-                radialaxis: { visible: true, range: [0, 100] }
-            },
-            title: 'No Data Available',
-            height: 400
-        };
-        
-        Plotly.newPlot('radar-chart', emptyRadarTrace, radarLayout);
-    }
-    
     // Update dashboard metrics
-    function updateDashboardMetrics() {
+    function updateDashboardMetrics(statusData = null) {
+        // Update from latest metrics
         if (latestMetrics.global && latestMetrics.global.accuracy !== undefined) {
             document.getElementById('global-accuracy').textContent = (latestMetrics.global.accuracy * 100).toFixed(1) + '%';
         }
         
-        // Update round information
-        if (latestMetrics.round) {
-            document.getElementById('training-round').textContent = latestMetrics.round;
+        // Update from status data if provided
+        if (statusData) {
+            if (statusData.current_round !== undefined) {
+                document.getElementById('training-round').textContent = statusData.current_round;
+            }
+            
+            if (statusData.total_rounds !== undefined) {
+                document.getElementById('max-rounds').textContent = `Max: ${statusData.total_rounds}`;
+            }
+            
+            // Update training status
+            isTraining = statusData.training || false;
+            updateTrainingStatus(statusData);
         }
         
         // Update local models count
@@ -432,22 +1174,76 @@
         }
         
         // Update system status
-        document.getElementById('system-status').textContent = latestMetrics.is_training ? 'Training' : 'Ready';
+        const systemStatusEl = document.getElementById('system-status');
+        if (systemStatusEl) {
+            systemStatusEl.textContent = isTraining ? 'Training' : 'Ready';
+        }
     }
     
-    // Load models data
+    // Update training status and controls
+    function updateTrainingStatus(statusData) {
+        const startBtn = document.getElementById('start-training-btn');
+        const stopBtn = document.getElementById('stop-training-btn');
+        const progressBar = document.getElementById('training-progress');
+        const progressText = document.getElementById('progress-text');
+        const statusBadge = document.getElementById('training-status-badge');
+        
+        if (isTraining) {
+            startBtn.disabled = true;
+            stopBtn.disabled = false;
+            
+            if (statusBadge) {
+                statusBadge.className = 'status-badge status-training';
+                statusBadge.innerHTML = '<i class="fas fa-circle"></i> Training';
+            }
+            
+            if (statusData.current_round && statusData.total_rounds) {
+                const progress = (statusData.current_round / statusData.total_rounds) * 100;
+                if (progressBar) {
+                    progressBar.style.width = `${progress}%`;
+                }
+                if (progressText) {
+                    progressText.textContent = `Round ${statusData.current_round} of ${statusData.total_rounds}`;
+                }
+            }
+        } else {
+            startBtn.disabled = false;
+            stopBtn.disabled = true;
+            
+            if (statusBadge) {
+                statusBadge.className = 'status-badge status-ready';
+                statusBadge.innerHTML = '<i class="fas fa-circle"></i> Ready';
+            }
+            
+            if (progressText) {
+                progressText.textContent = 'Ready to start';
+            }
+        }
+    }
+    
+    // Load models data with enhanced error handling
     function loadModelsData() {
+        showPlotState('models', 'loading');
+        
         fetch('/api/models/info')
             .then(response => response.json())
             .then(data => {
                 if (!data.error) {
                     updateModelsCards(data);
+                    showPlotState('models', 'chart');
+                } else {
+                    showPlotState('models', 'error');
+                    showToast(`Error loading models: ${data.error}`, 'error');
                 }
             })
-            .catch(error => console.error('Error loading models info:', error));
+            .catch(error => {
+                console.error('Error loading models info:', error);
+                showPlotState('models', 'error');
+                showToast('Network error loading models', 'error');
+            });
     }
     
-    // Update models cards
+    // Enhanced models cards update
     function updateModelsCards(data) {
         if (!data || !data.local_models) return;
         
@@ -461,9 +1257,11 @@
             const modelType = info.model_type || 'Unknown';
             const features = info.n_features || 'N/A';
             const classes = info.n_classes || 'N/A';
+            const accuracy = latestMetrics.local && latestMetrics.local[name] ? 
+                (latestMetrics.local[name].accuracy * 100).toFixed(1) + '%' : 'N/A';
             
             html += `
-                <div class="col-md-4 mb-3">
+                <div class="col-md-4 mb-4">
                     <div class="model-card">
                         <div class="model-header">
                             <div class="model-title">
@@ -488,14 +1286,11 @@
                             </div>
                             <div class="model-stat">
                                 <div class="model-stat-label">Accuracy</div>
-                                <div class="model-stat-value" id="${name}-accuracy">
-                                    ${latestMetrics.local && latestMetrics.local[name] ? 
-                                        (latestMetrics.local[name].accuracy * 100).toFixed(1) + '%' : 'N/A'}
-                                </div>
+                                <div class="model-stat-value">${accuracy}</div>
                             </div>
                         </div>
                         <div class="text-center mt-3">
-                            <button class="btn btn-sm btn-primary" onclick="regeneratePlot('${name}-chart')">
+                            <button class="btn btn-sm btn-primary" onclick="viewModelDetails('${name}')">
                                 <i class="fas fa-chart-line me-1"></i>
                                 View Details
                             </button>
@@ -514,13 +1309,20 @@
         container.innerHTML = html;
     }
     
+    // View model details
+    function viewModelDetails(modelName) {
+        showToast(`Loading details for ${modelName}...`, 'info', 2000);
+        // This could open a modal or navigate to a detailed view
+        // For now, we'll just show a toast
+        showToast(`${modelName} details would be shown here`, 'info');
+    }
+    
     // Training control functions
     function startTraining() {
         const sampleSize = parseInt(document.getElementById('sample-size').value);
         const maxRounds = parseInt(document.getElementById('max-rounds-input').value);
         
-        document.getElementById('start-training-btn').disabled = true;
-        document.getElementById('progress-text').textContent = 'Starting training...';
+        showToast('Starting federated training...', 'info');
         
         fetch('/api/training/start', {
             method: 'POST',
@@ -535,24 +1337,21 @@
         .then(response => response.json())
         .then(data => {
             if (data.error) {
-                alert(`Error starting training: ${data.error}`);
-                document.getElementById('start-training-btn').disabled = false;
-                document.getElementById('progress-text').textContent = 'Ready to start';
+                showToast(`Error starting training: ${data.error}`, 'error');
             } else {
-                document.getElementById('max-rounds').textContent = `Max: ${maxRounds}`;
+                showToast('Training started successfully!', 'success');
+                isTraining = true;
+                updateTrainingStatus({training: true, total_rounds: maxRounds, current_round: 0});
             }
         })
         .catch(error => {
             console.error('Error starting training:', error);
-            alert('Error starting training. See console for details.');
-            document.getElementById('start-training-btn').disabled = false;
-            document.getElementById('progress-text').textContent = 'Ready to start';
+            showToast('Network error starting training', 'error');
         });
     }
     
     function stopTraining() {
-        document.getElementById('stop-training-btn').disabled = true;
-        document.getElementById('progress-text').textContent = 'Stopping training...';
+        showToast('Stopping training...', 'info');
         
         fetch('/api/training/stop', {
             method: 'POST'
@@ -560,58 +1359,54 @@
         .then(response => response.json())
         .then(data => {
             if (data.error) {
-                alert(`Error stopping training: ${data.error}`);
-                document.getElementById('stop-training-btn').disabled = false;
+                showToast(`Error stopping training: ${data.error}`, 'error');
+            } else {
+                showToast('Training stopped successfully', 'success');
+                isTraining = false;
+                updateTrainingStatus({training: false});
             }
         })
         .catch(error => {
             console.error('Error stopping training:', error);
-            alert('Error stopping training. See console for details.');
-            document.getElementById('stop-training-btn').disabled = false;
+            showToast('Network error stopping training', 'error');
         });
     }
     
-    // Tab switching
-    function setupTabSwitching() {
-        document.querySelectorAll('.custom-tab').forEach(tab => {
-            tab.addEventListener('click', function() {
-                const tabGroup = this.closest('.card-body').querySelector('.custom-tabs').dataset.group || 'default';
-                const tabId = this.dataset.target;
+    // Start periodic updates
+    function startPeriodicUpdates() {
+        // Update every 10 seconds during training, 30 seconds when idle
+        setInterval(() => {
+            const updateInterval = isTraining ? 10000 : 30000;
+            
+            // Refresh system status
+            fetch('/api/status')
+                .then(response => response.json())
+                .then(data => {
+                    updateDashboardMetrics(data);
+                })
+                .catch(error => console.error('Error in periodic update:', error));
                 
-                // Deactivate all tabs in this group
-                document.querySelectorAll(`.custom-tab[data-group="${tabGroup}"]`).forEach(t => {
-                    t.classList.remove('active');
-                });
-                
-                // Hide all tab contents in this group
-                document.querySelectorAll(`.tab-content[data-group="${tabGroup}"]`).forEach(content => {
-                    content.classList.remove('active');
-                });
-                
-                // Activate this tab and show its content
-                this.classList.add('active');
-                document.getElementById(tabId).classList.add('active');
-            });
-        });
+        }, 5000); // Check every 5 seconds
     }
     
-    // Switch between tabs
+    // Legacy function compatibility
+    function updateAllCharts() {
+        // Load the current active tab
+        loadPlotForTab(currentActiveTab);
+    }
+    
     function switchTab(tabId, tabGroup) {
-        // Hide all tabs in this group
-        document.querySelectorAll('.tab-content').forEach(tab => {
-            tab.classList.remove('active');
-        });
-        
-        // Deactivate all tab buttons
-        document.querySelectorAll('.custom-tab').forEach(tab => {
-            tab.classList.remove('active');
-        });
-        
-        // Show selected tab
-        document.getElementById(tabId).classList.add('active');
-        
-        // Activate clicked tab button
-        event.currentTarget.classList.add('active');
+        // Legacy function - redirect to enhanced version
+        const tabElement = document.querySelector(`[onclick*="${tabId}"]`);
+        if (tabElement) {
+            switchEnhancedTab(tabId, tabElement);
+        }
+    }
+    
+    function regeneratePlot(containerId) {
+        // Legacy function - redirect to enhanced version
+        const plotType = containerId.replace('-chart', '');
+        retryPlot(plotType);
     }
 </script>
-{% endblock %} 
+{% endblock %}
