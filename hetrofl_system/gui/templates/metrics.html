@@ -1,18 +1,22 @@
 {% extends "base.html" %}
 
 {% block title %}Metrics & Analytics - HETROFL System{% endblock %}
+{% block page_title %}Analytics{% endblock %}
 
 {% block content %}
-<div class="container-fluid">
-    <div class="row">
-        <div class="col-12">
-            <div class="d-flex justify-content-between align-items-center mb-4">
-                <h2><i class="fas fa-chart-line me-2"></i>Metrics & Analytics</h2>
-                <div>
-                    <button class="btn btn-primary" onclick="refreshMetrics()">
-                        <i class="fas fa-sync-alt me-2"></i>Refresh
-                    </button>
-                    <button class="btn btn-success" onclick="exportMetrics()">
+<!-- Metrics & Analytics -->
+<div class="modern-card">
+    <div class="card-header">
+        <h2 class="card-title">
+            <i class="fas fa-chart-line"></i>
+            Metrics & Analytics
+        </h2>
+        <div style="display: flex; gap: 0.75rem;">
+            <button class="btn-modern btn-primary" onclick="refreshMetrics()">
+                <i class="fas fa-sync-alt"></i>
+                Refresh
+            </button>
+            <button class="btn-modern" onclick="exportMetrics()" style="background: var(--success); color: white;">
                         <i class="fas fa-download me-2"></i>Export
                     </button>
                 </div>

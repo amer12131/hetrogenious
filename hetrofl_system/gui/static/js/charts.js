@@ -1,23 +1,41 @@
-// HETROFL System Plotting Functions
-// This module provides enhanced plotting capabilities using Plotly.js
+// HETROFL System Enhanced Plotting Functions
+// Modern plotting capabilities with theme support
 
-// Global color palette for consistent styling
+// Enhanced color palette with theme support
 const COLORS = {
-    global: '#e74c3c',       // Red for global model
-    xgboost: '#3498db',      // Blue for XGBoost
-    catboost: '#2ecc71',     // Green for CatBoost
-    random_forest: '#f39c12', // Orange for Random Forest
-    background: '#f8f9fa',   // Light background
-    grid: '#eaecef',         // Grid lines
-    text: '#2c3e50'          // Text color
+    global: '#ef4444',       // Red for global model
+    xgboost: '#3b82f6',      // Blue for XGBoost
+    catboost: '#10b981',     // Green for CatBoost
+    random_forest: '#f59e0b', // Orange for Random Forest
+    
+    // Theme-aware colors
+    get background() {
+        return document.documentElement.getAttribute('data-theme') === 'dark' ? '#1e293b' : '#ffffff';
+    },
+    get grid() {
+        return document.documentElement.getAttribute('data-theme') === 'dark' ? '#334155' : '#e2e8f0';
+    },
+    get text() {
+        return document.documentElement.getAttribute('data-theme') === 'dark' ? '#f8fafc' : '#0f172a';
+    },
+    get paper() {
+        return document.documentElement.getAttribute('data-theme') === 'dark' ? '#0f172a' : '#ffffff';
+    }
 };
 
-// Plot size defaults
+// Enhanced plot configuration
 const PLOT_CONFIG = {
     responsive: true,
     displayModeBar: true,
     displaylogo: false,
-    modeBarButtonsToRemove: ['lasso2d', 'select2d']
+    modeBarButtonsToRemove: ['lasso2d', 'select2d', 'autoScale2d'],
+    toImageButtonOptions: {
+        format: 'png',
+        filename: 'hetrofl_chart',
+        height: 600,
+        width: 1000,
+        scale: 2
+    }
 };
 
 // Error handling for plots
@@ -120,35 +138,52 @@ function createAccuracyComparisonChart(containerId, metricsHistory) {
             return;
         }
         
-        // Layout configuration
+        // Enhanced layout configuration with theme support
         const layout = {
-            title: 'Model Accuracy Comparison',
-            xaxis: {
-                title: 'Training Round',
-                gridcolor: COLORS.grid,
-                gridwidth: 1,
-                zeroline: false
+            title: {
+                text: 'Model Accuracy Comparison',
+                font: {
+                    family: 'Inter, sans-serif',
+                    size: 18,
+                    color: COLORS.text
+                }
             },
-            yaxis: {
-                title: 'Accuracy (%)',
+            xaxis: {
+                title: {
+                    text: 'Training Round',
+                    font: { family: 'Inter, sans-serif', color: COLORS.text }
+                },
                 gridcolor: COLORS.grid,
                 gridwidth: 1,
                 zeroline: false,
-                range: [0, 100]
+                tickfont: { color: COLORS.text }
+            },
+            yaxis: {
+                title: {
+                    text: 'Accuracy (%)',
+                    font: { family: 'Inter, sans-serif', color: COLORS.text }
+                },
+                gridcolor: COLORS.grid,
+                gridwidth: 1,
+                zeroline: false,
+                range: [0, 100],
+                tickfont: { color: COLORS.text }
             },
             font: {
-                family: 'Segoe UI, sans-serif',
+                family: 'Inter, sans-serif',
                 color: COLORS.text
             },
             legend: {
                 orientation: 'h',
-                y: -0.2
+                y: -0.15,
+                font: { color: COLORS.text }
             },
             margin: { t: 60, b: 80, l: 60, r: 30 },
             plot_bgcolor: COLORS.background,
-            paper_bgcolor: 'white',
-            hovermode: 'closest',
-            height: 450
+            paper_bgcolor: COLORS.paper,
+            hovermode: 'x unified',
+            height: 400,
+            showlegend: true
         };
         
         // Create the plot
