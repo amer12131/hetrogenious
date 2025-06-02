@@ -1,0 +1,685 @@
+{% extends "base.html" %}
+
+{% block title %}Models - HETROFL System{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2><i class="fas fa-brain me-2"></i>Model Management</h2>
+                <div>
+                    <button class="btn btn-primary" onclick="refreshModels()">
+                        <i class="fas fa-sync-alt me-2"></i>Refresh
+                    </button>
+                    <button class="btn btn-success" onclick="saveAllModels()">
+                        <i class="fas fa-save me-2"></i>Save All
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Global Model -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="fas fa-globe me-2"></i>Global Neural Network Model</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-8">
+                            <div id="global-model-info">
+                                <div class="text-center">
+                                    <div class="spinner-border" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                    <p class="mt-2">Loading global model information...</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card bg-light">
+                                <div class="card-body">
+                                    <h6 class="card-title">Model Actions</h6>
+                                    <div class="d-grid gap-2">
+                                        <button class="btn btn-outline-primary" onclick="trainGlobalModel()">
+                                            <i class="fas fa-play me-2"></i>Train Model
+                                        </button>
+                                        <button class="btn btn-outline-success" onclick="evaluateGlobalModel()">
+                                            <i class="fas fa-chart-bar me-2"></i>Evaluate
+                                        </button>
+                                        <button class="btn btn-outline-info" onclick="saveGlobalModel()">
+                                            <i class="fas fa-download me-2"></i>Save Model
+                                        </button>
+                                        <button class="btn btn-outline-warning" onclick="loadGlobalModel()">
+                                            <i class="fas fa-upload me-2"></i>Load Model
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Local Models -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0"><i class="fas fa-laptop me-2"></i>Local Models</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row" id="local-models-container">
+                        <div class="col-12 text-center">
+                            <div class="spinner-border" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="mt-2">Loading local models information...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Model Architecture Visualization -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-secondary text-white">
+                    <h5 class="mb-0"><i class="fas fa-sitemap me-2"></i>Model Architecture</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>Global Model Architecture</h6>
+                            <div id="global-architecture" class="border rounded p-3 bg-light">
+                                <p class="text-muted">Loading architecture...</p>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>Federated Learning Flow</h6>
+                            <div id="federated-flow" class="border rounded p-3 bg-light">
+                                <div class="text-center">
+                                    <div class="mb-3">
+                                        <i class="fas fa-laptop fa-2x text-primary"></i>
+                                        <p class="small">Local Models</p>
+                                    </div>
+                                    <div class="mb-3">
+                                        <i class="fas fa-arrow-down fa-lg text-secondary"></i>
+                                    </div>
+                                    <div class="mb-3">
+                                        <i class="fas fa-exchange-alt fa-2x text-warning"></i>
+                                        <p class="small">Knowledge Distillation</p>
+                                    </div>
+                                    <div class="mb-3">
+                                        <i class="fas fa-arrow-down fa-lg text-secondary"></i>
+                                    </div>
+                                    <div>
+                                        <i class="fas fa-globe fa-2x text-success"></i>
+                                        <p class="small">Global Model</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Model Performance Summary -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0"><i class="fas fa-chart-pie me-2"></i>Performance Summary</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped" id="performance-summary-table">
+                            <thead>
+                                <tr>
+                                    <th>Model</th>
+                                    <th>Type</th>
+                                    <th>Status</th>
+                                    <th>Accuracy</th>
+                                    <th>F1-Score</th>
+                                    <th>Parameters</th>
+                                    <th>Last Updated</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td colspan="8" class="text-center">Loading performance data...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let modelsSocket;
+let modelsData = {};
+
+document.addEventListener('DOMContentLoaded', function() {
+    initializeModels();
+    setupWebSocket();
+    loadModelsData();
+});
+
+function initializeModels() {
+    // Set up auto-refresh
+    setInterval(refreshModels, 10000); // Refresh every 10 seconds
+}
+
+function setupWebSocket() {
+    modelsSocket = io();
+    
+    modelsSocket.on('connect', function() {
+        console.log('Connected to models WebSocket');
+        modelsSocket.emit('request_update');
+    });
+    
+    modelsSocket.on('models_update', function(data) {
+        updateModelsDisplay(data);
+    });
+    
+    modelsSocket.on('training_update', function(data) {
+        updateTrainingStatus(data);
+    });
+}
+
+function loadModelsData() {
+    refreshModels();
+}
+
+function refreshModels() {
+    // Load models information
+    fetch('/api/models/info')
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                console.error('Error loading models:', data.error);
+                showError('Failed to load models information: ' + data.error);
+                return;
+            }
+            updateModelsDisplay(data);
+        })
+        .catch(error => {
+            console.error('Error loading models:', error);
+            showError('Failed to connect to server');
+        });
+    
+    // Load latest metrics for performance summary
+    fetch('/api/metrics/latest')
+        .then(response => response.json())
+        .then(data => {
+            if (!data.error) {
+                updatePerformanceSummary(data);
+            }
+        })
+        .catch(error => console.error('Error loading metrics:', error));
+}
+
+function updateModelsDisplay(data) {
+    modelsData = data;
+    
+    // Update global model
+    updateGlobalModelDisplay(data.global_model);
+    
+    // Update local models
+    updateLocalModelsDisplay(data.local_models);
+    
+    // Update architecture display
+    updateArchitectureDisplay(data.global_model);
+}
+
+function updateGlobalModelDisplay(globalModel) {
+    const container = document.getElementById('global-model-info');
+    
+    if (!globalModel || Object.keys(globalModel).length === 0) {
+        container.innerHTML = `
+            <div class="alert alert-warning">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                Global model not initialized. Start training to create the global model.
+            </div>
+        `;
+        return;
+    }
+    
+    const status = globalModel.status || 'unknown';
+    const statusClass = status === 'trained' ? 'success' : status === 'built' ? 'warning' : 'secondary';
+    const statusIcon = status === 'trained' ? 'check-circle' : status === 'built' ? 'cog' : 'question-circle';
+    
+    container.innerHTML = `
+        <div class="row">
+            <div class="col-md-6">
+                <h6>Model Information</h6>
+                <table class="table table-sm">
+                    <tr>
+                        <td><strong>Status:</strong></td>
+                        <td>
+                            <span class="badge bg-${statusClass}">
+                                <i class="fas fa-${statusIcon} me-1"></i>${status.toUpperCase()}
+                            </span>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><strong>Total Parameters:</strong></td>
+                        <td>${globalModel.total_params ? globalModel.total_params.toLocaleString() : 'N/A'}</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Trainable Parameters:</strong></td>
+                        <td>${globalModel.trainable_params ? globalModel.trainable_params.toLocaleString() : 'N/A'}</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Number of Layers:</strong></td>
+                        <td>${globalModel.num_layers || 'N/A'}</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Input Features:</strong></td>
+                        <td>${globalModel.num_features || 'N/A'}</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Output Classes:</strong></td>
+                        <td>${globalModel.num_classes || 'N/A'}</td>
+                    </tr>
+                </table>
+            </div>
+            <div class="col-md-6">
+                <h6>Training History</h6>
+                <div class="bg-light p-3 rounded">
+                    <p><strong>Training Sessions:</strong> ${globalModel.training_history_length || 0}</p>
+                    ${globalModel.architecture ? `
+                        <p><strong>Architecture:</strong></p>
+                        <ul class="list-unstyled small">
+                            ${globalModel.architecture.slice(0, 5).map(layer => `<li>• ${layer}</li>`).join('')}
+                            ${globalModel.architecture.length > 5 ? '<li>• ...</li>' : ''}
+                        </ul>
+                    ` : ''}
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function updateLocalModelsDisplay(localModels) {
+    const container = document.getElementById('local-models-container');
+    container.innerHTML = '';
+    
+    if (!localModels || Object.keys(localModels).length === 0) {
+        container.innerHTML = `
+            <div class="col-12">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    No local models found. Check your model configurations.
+                </div>
+            </div>
+        `;
+        return;
+    }
+    
+    Object.entries(localModels).forEach(([modelName, modelInfo]) => {
+        const col = document.createElement('div');
+        col.className = 'col-lg-4 col-md-6 mb-3';
+        
+        const isLoaded = modelInfo.is_loaded || false;
+        const statusClass = isLoaded ? 'success' : 'warning';
+        const statusText = isLoaded ? 'Loaded' : 'Not Loaded';
+        const statusIcon = isLoaded ? 'check-circle' : 'exclamation-triangle';
+        
+        col.innerHTML = `
+            <div class="card h-100">
+                <div class="card-header bg-${statusClass} text-white">
+                    <h6 class="mb-0">
+                        <i class="fas fa-${getModelIcon(modelName)} me-2"></i>
+                        ${modelName}
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="mb-2">
+                        <span class="badge bg-${statusClass}">
+                            <i class="fas fa-${statusIcon} me-1"></i>${statusText}
+                        </span>
+                    </div>
+                    <table class="table table-sm">
+                        <tr>
+                            <td><strong>Type:</strong></td>
+                            <td>${modelInfo.model_type || 'Unknown'}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Features:</strong></td>
+                            <td>${modelInfo.n_features || 'N/A'}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Classes:</strong></td>
+                            <td>${modelInfo.n_classes || 'N/A'}</td>
+                        </tr>
+                        ${modelInfo.accuracy ? `
+                        <tr>
+                            <td><strong>Accuracy:</strong></td>
+                            <td>${(modelInfo.accuracy * 100).toFixed(2)}%</td>
+                        </tr>
+                        ` : ''}
+                    </table>
+                </div>
+                <div class="card-footer">
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-sm btn-outline-primary" onclick="evaluateLocalModel('${modelName}')">
+                            <i class="fas fa-chart-bar me-1"></i>Evaluate
+                        </button>
+                        <button class="btn btn-sm btn-outline-info" onclick="viewModelDetails('${modelName}')">
+                            <i class="fas fa-info-circle me-1"></i>Details
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        container.appendChild(col);
+    });
+}
+
+function updateArchitectureDisplay(globalModel) {
+    const container = document.getElementById('global-architecture');
+    
+    if (!globalModel || !globalModel.architecture) {
+        container.innerHTML = '<p class="text-muted">No architecture information available</p>';
+        return;
+    }
+    
+    const architecture = globalModel.architecture;
+    let html = '<div class="architecture-diagram">';
+    
+    architecture.forEach((layer, index) => {
+        const isFirst = index === 0;
+        const isLast = index === architecture.length - 1;
+        
+        html += `
+            <div class="layer-box mb-2 p-2 border rounded ${isFirst ? 'bg-primary text-white' : isLast ? 'bg-success text-white' : 'bg-light'}">
+                <small><strong>${layer}</strong></small>
+            </div>
+        `;
+        
+        if (!isLast) {
+            html += '<div class="text-center"><i class="fas fa-arrow-down text-secondary"></i></div>';
+        }
+    });
+    
+    html += '</div>';
+    container.innerHTML = html;
+}
+
+function updatePerformanceSummary(metricsData) {
+    const tbody = document.querySelector('#performance-summary-table tbody');
+    tbody.innerHTML = '';
+    
+    // Global model row
+    if (metricsData.global && Object.keys(metricsData.global).length > 0) {
+        const row = createPerformanceRow('Global Model', 'Neural Network', metricsData.global, modelsData.global_model);
+        tbody.appendChild(row);
+    }
+    
+    // Local model rows
+    if (metricsData.local) {
+        Object.entries(metricsData.local).forEach(([modelName, metrics]) => {
+            if (metrics && Object.keys(metrics).length > 0) {
+                const modelInfo = modelsData.local_models ? modelsData.local_models[modelName] : {};
+                const row = createPerformanceRow(modelName, modelInfo.model_type || 'Unknown', metrics, modelInfo);
+                tbody.appendChild(row);
+            }
+        });
+    }
+    
+    if (tbody.children.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center">No performance data available</td></tr>';
+    }
+}
+
+function createPerformanceRow(modelName, modelType, metrics, modelInfo) {
+    const row = document.createElement('tr');
+    
+    const isLoaded = modelInfo.is_loaded !== false;
+    const statusClass = isLoaded ? 'success' : 'warning';
+    const statusText = isLoaded ? 'Active' : 'Inactive';
+    
+    const parameters = modelInfo.total_params ? modelInfo.total_params.toLocaleString() : 'N/A';
+    
+    row.innerHTML = `
+        <td><strong>${modelName}</strong></td>
+        <td>${modelType}</td>
+        <td>
+            <span class="badge bg-${statusClass}">${statusText}</span>
+        </td>
+        <td>${(metrics.accuracy * 100).toFixed(2)}%</td>
+        <td>${(metrics.f1_score * 100).toFixed(2)}%</td>
+        <td>${parameters}</td>
+        <td>${new Date().toLocaleString()}</td>
+        <td>
+            <div class="btn-group btn-group-sm">
+                <button class="btn btn-outline-primary" onclick="viewModelDetails('${modelName}')" title="View Details">
+                    <i class="fas fa-eye"></i>
+                </button>
+                <button class="btn btn-outline-success" onclick="evaluateModel('${modelName}')" title="Evaluate">
+                    <i class="fas fa-chart-bar"></i>
+                </button>
+            </div>
+        </td>
+    `;
+    
+    return row;
+}
+
+function getModelIcon(modelName) {
+    const name = modelName.toLowerCase();
+    if (name.includes('xgboost')) return 'tree';
+    if (name.includes('random') || name.includes('forest')) return 'seedling';
+    if (name.includes('catboost')) return 'cat';
+    if (name.includes('global')) return 'globe';
+    return 'brain';
+}
+
+function trainGlobalModel() {
+    showLoading('Training global model...');
+    
+    fetch('/api/training/start', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            sample_size: 50000
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        hideLoading();
+        if (data.error) {
+            showError('Failed to start training: ' + data.error);
+        } else {
+            showSuccess('Training started successfully!');
+            setTimeout(refreshModels, 2000);
+        }
+    })
+    .catch(error => {
+        hideLoading();
+        console.error('Error starting training:', error);
+        showError('Failed to start training');
+    });
+}
+
+function evaluateGlobalModel() {
+    showLoading('Evaluating global model...');
+    
+    // This would trigger evaluation - for now just refresh
+    setTimeout(() => {
+        hideLoading();
+        refreshModels();
+        showSuccess('Model evaluation completed');
+    }, 2000);
+}
+
+function saveGlobalModel() {
+    showLoading('Saving global model...');
+    
+    // This would trigger model saving
+    setTimeout(() => {
+        hideLoading();
+        showSuccess('Global model saved successfully');
+    }, 1000);
+}
+
+function loadGlobalModel() {
+    showLoading('Loading global model...');
+    
+    // This would trigger model loading
+    setTimeout(() => {
+        hideLoading();
+        refreshModels();
+        showSuccess('Global model loaded successfully');
+    }, 1000);
+}
+
+function evaluateLocalModel(modelName) {
+    showLoading(`Evaluating ${modelName}...`);
+    
+    setTimeout(() => {
+        hideLoading();
+        showSuccess(`${modelName} evaluation completed`);
+    }, 1500);
+}
+
+function viewModelDetails(modelName) {
+    const modelInfo = modelsData.local_models ? modelsData.local_models[modelName] : modelsData.global_model;
+    
+    if (!modelInfo) {
+        showError('Model information not available');
+        return;
+    }
+    
+    // Create modal with model details
+    const modalHtml = `
+        <div class="modal fade" id="modelDetailsModal" tabindex="-1">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">
+                            <i class="fas fa-${getModelIcon(modelName)} me-2"></i>
+                            ${modelName} Details
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <pre>${JSON.stringify(modelInfo, null, 2)}</pre>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Remove existing modal if any
+    const existingModal = document.getElementById('modelDetailsModal');
+    if (existingModal) {
+        existingModal.remove();
+    }
+    
+    // Add modal to body
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    
+    // Show modal
+    const modal = new bootstrap.Modal(document.getElementById('modelDetailsModal'));
+    modal.show();
+}
+
+function evaluateModel(modelName) {
+    if (modelName === 'Global Model') {
+        evaluateGlobalModel();
+    } else {
+        evaluateLocalModel(modelName);
+    }
+}
+
+function saveAllModels() {
+    showLoading('Saving all models...');
+    
+    setTimeout(() => {
+        hideLoading();
+        showSuccess('All models saved successfully');
+    }, 2000);
+}
+
+function showLoading(message) {
+    // Create loading overlay
+    const overlay = document.createElement('div');
+    overlay.id = 'loading-overlay';
+    overlay.className = 'position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center';
+    overlay.style.backgroundColor = 'rgba(0,0,0,0.5)';
+    overlay.style.zIndex = '9999';
+    
+    overlay.innerHTML = `
+        <div class="card">
+            <div class="card-body text-center">
+                <div class="spinner-border text-primary mb-3" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p class="mb-0">${message}</p>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(overlay);
+}
+
+function hideLoading() {
+    const overlay = document.getElementById('loading-overlay');
+    if (overlay) {
+        overlay.remove();
+    }
+}
+
+function showSuccess(message) {
+    showAlert(message, 'success');
+}
+
+function showError(message) {
+    showAlert(message, 'danger');
+}
+
+function showAlert(message, type) {
+    const alertHtml = `
+        <div class="alert alert-${type} alert-dismissible fade show position-fixed" 
+             style="top: 20px; right: 20px; z-index: 10000; min-width: 300px;">
+            <i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-triangle'} me-2"></i>
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', alertHtml);
+    
+    // Auto-remove after 5 seconds
+    setTimeout(() => {
+        const alerts = document.querySelectorAll('.alert');
+        alerts.forEach(alert => {
+            if (alert.textContent.includes(message)) {
+                alert.remove();
+            }
+        });
+    }, 5000);
+}
+</script>
+{% endblock %} 

@@ -1,0 +1,617 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - HETROFL System{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="/static/css/custom.css">
+{% endblock %}
+
+{% block content %}
+<div id="alert-container"></div>
+
+<!-- System Overview -->
+<div class="row mt-3">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="fas fa-tachometer-alt me-2"></i>
+                    System Overview
+                </h5>
+                <div class="live-indicator" id="live-indicator">
+                    <div class="live-dot"></div>
+                    <span>Live Updates</span>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="metrics-grid">
+                    <!-- Global Model Status -->
+                    <div class="metric-card primary">
+                        <div class="metric-value" id="global-accuracy">--</div>
+                        <div class="metric-label">Global Model Accuracy</div>
+                        <div class="metric-change" id="global-accuracy-change">
+                            <i class="fas fa-arrow-up me-1"></i>
+                            <span>0.0%</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Training Progress -->
+                    <div class="metric-card success">
+                        <div class="metric-value" id="training-round">--</div>
+                        <div class="metric-label">Current Round</div>
+                        <div class="metric-change">
+                            <span id="max-rounds">Max: 0</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Local Models -->
+                    <div class="metric-card info">
+                        <div class="metric-value" id="local-models-count">--</div>
+                        <div class="metric-label">Local Models</div>
+                        <div class="metric-change">
+                            <span id="best-local-model">Best: --</span>
+                        </div>
+                    </div>
+                    
+                    <!-- System Status -->
+                    <div class="metric-card secondary">
+                        <div class="metric-value" id="system-status">--</div>
+                        <div class="metric-label">System Status</div>
+                        <div class="metric-change">
+                            <span id="system-uptime">Uptime: --</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Main Content -->
+<div class="row mt-4">
+    <!-- Live Performance Chart -->
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="fas fa-chart-line me-2"></i>
+                    Live Performance Tracking
+                </h5>
+                <div>
+                    <button class="btn btn-sm btn-outline-primary" onclick="regeneratePlot('accuracy-chart')">
+                        <i class="fas fa-sync-alt me-1"></i>
+                        Refresh
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <ul class="custom-tabs">
+                    <li class="custom-tab active" onclick="switchTab('accuracy-tab', 'performance-tabs')">Accuracy</li>
+                    <li class="custom-tab" onclick="switchTab('f1-tab', 'performance-tabs')">F1 Score</li>
+                    <li class="custom-tab" onclick="switchTab('radar-tab', 'performance-tabs')">Radar</li>
+                    <li class="custom-tab" onclick="switchTab('training-tab', 'performance-tabs')">Training</li>
+                </ul>
+                
+                <div id="accuracy-tab" class="tab-content active">
+                    <div class="plot-container">
+                        <div id="accuracy-chart" style="height: 400px;"></div>
+                    </div>
+                </div>
+                
+                <div id="f1-tab" class="tab-content">
+                    <div class="plot-container">
+                        <div id="f1-chart" style="height: 400px;"></div>
+                    </div>
+                </div>
+                
+                <div id="radar-tab" class="tab-content">
+                    <div class="plot-container">
+                        <div id="radar-chart" style="height: 400px;"></div>
+                    </div>
+                </div>
+                
+                <div id="training-tab" class="tab-content">
+                    <div class="plot-container">
+                        <div id="training-chart" style="height: 400px;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Training Controls -->
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-play me-2"></i>
+                    Training Controls
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label for="sample-size" class="form-label">Sample Size</label>
+                    <div class="input-group">
+                        <input type="number" class="form-control" id="sample-size" value="50000" min="1000" max="1000000">
+                        <span class="input-group-text">samples</span>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label for="max-rounds" class="form-label">Max Rounds</label>
+                    <div class="input-group">
+                        <input type="number" class="form-control" id="max-rounds-input" value="50" min="1" max="1000">
+                        <span class="input-group-text">rounds</span>
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label">Training Progress</label>
+                    <div class="progress mb-2" style="height: 10px;">
+                        <div class="progress-bar" id="training-progress" role="progressbar" style="width: 0%"></div>
+                    </div>
+                    <small class="text-muted" id="progress-text">Ready to start</small>
+                </div>
+                
+                <div class="d-grid gap-2">
+                    <button class="btn btn-success" id="start-training-btn" onclick="startTraining()">
+                        <i class="fas fa-play me-2"></i>Start Training
+                    </button>
+                    <button class="btn btn-danger" id="stop-training-btn" onclick="stopTraining()" disabled>
+                        <i class="fas fa-stop me-2"></i>Stop Training
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Quick Stats -->
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-info-circle me-2"></i>
+                    Model Improvements
+                </h5>
+            </div>
+            <div class="card-body p-0">
+                <div id="improvements-chart" style="height: 270px;">
+                    <div class="loading-spinner">
+                        <div class="spinner mb-3"></div>
+                        <p>Loading improvement data...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Local Models Row -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="fas fa-brain me-2"></i>
+                    Local Models Status
+                </h5>
+                <div>
+                    <button class="btn btn-sm btn-outline-primary" onclick="loadModelsData()">
+                        <i class="fas fa-sync-alt me-1"></i>
+                        Refresh
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="row" id="local-models-cards">
+                    <div class="col-12 text-center">
+                        <div class="spinner-border" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <p class="mt-2">Loading models...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="/static/js/charts.js"></script>
+<script>
+    // Dashboard-specific variables
+    let metricsHistory = {global: [], local: {}};
+    let activityLog = [];
+    let latestMetrics = {global: {}, local: {}};
+    let improvements = {global: {}, local: {}};
+    
+    // Initialize dashboard
+    document.addEventListener('DOMContentLoaded', function() {
+        loadInitialData();
+        setupTabSwitching();
+        setupSocket();
+    });
+    
+    // Load initial data
+    function loadInitialData() {
+        // Load metrics history
+        fetch('/api/metrics/history')
+            .then(response => response.json())
+            .then(data => {
+                if (!data.error) {
+                    metricsHistory = data;
+                    updateAllCharts();
+                }
+            })
+            .catch(error => console.error('Error loading metrics history:', error));
+        
+        // Load latest metrics
+        fetch('/api/metrics/latest')
+            .then(response => response.json())
+            .then(data => {
+                if (!data.error) {
+                    latestMetrics = data;
+                    updateDashboardMetrics();
+                }
+            })
+            .catch(error => console.error('Error loading latest metrics:', error));
+        
+        // Load improvements
+        fetch('/api/metrics/improvements')
+            .then(response => response.json())
+            .then(data => {
+                if (!data.error) {
+                    improvements = data;
+                    createImprovementChart('improvements-chart', improvements);
+                }
+            })
+            .catch(error => console.error('Error loading improvements:', error));
+        
+        // Load models
+        loadModelsData();
+    }
+    
+    // Setup WebSocket for real-time updates
+    function setupSocket() {
+        const socket = io();
+        
+        socket.on('connect', function() {
+            console.log('Connected to server');
+            updateLiveIndicator(true);
+        });
+        
+        socket.on('disconnect', function() {
+            console.log('Disconnected from server');
+            updateLiveIndicator(false);
+        });
+        
+        socket.on('metrics_update', function(data) {
+            if (data) {
+                latestMetrics = data;
+                updateDashboardMetrics();
+                
+                // Fetch latest history
+                fetch('/api/metrics/history')
+                    .then(response => response.json())
+                    .then(historyData => {
+                        if (!historyData.error) {
+                            metricsHistory = historyData;
+                            updateAllCharts();
+                        }
+                    })
+                    .catch(error => console.error('Error updating metrics history:', error));
+                
+                // Fetch latest improvements
+                fetch('/api/metrics/improvements')
+                    .then(response => response.json())
+                    .then(improvementsData => {
+                        if (!improvementsData.error) {
+                            improvements = improvementsData;
+                            createImprovementChart('improvements-chart', improvements);
+                        }
+                    })
+                    .catch(error => console.error('Error updating improvements:', error));
+            }
+        });
+    }
+    
+    // Update live indicator
+    function updateLiveIndicator(isConnected) {
+        const indicator = document.getElementById('live-indicator');
+        if (indicator) {
+            if (isConnected) {
+                indicator.innerHTML = '<div class="live-dot"></div><span>Live Updates</span>';
+            } else {
+                indicator.innerHTML = '<div class="live-dot" style="background-color: #e74c3c;"></div><span>Disconnected</span>';
+            }
+        }
+    }
+    
+    // Update all charts
+    function updateAllCharts() {
+        // If metrics history is empty or doesn't have enough data, fetch sample data
+        if (!metricsHistory.global || metricsHistory.global.length === 0) {
+            console.log("No real metrics history found, loading sample visualization data");
+            fetch('/api/metrics/history')
+                .then(response => response.json())
+                .then(data => {
+                    metricsHistory = data;
+                    createAccuracyComparisonChart('accuracy-chart', metricsHistory);
+                    createF1ScoreComparisonChart('f1-chart', metricsHistory);
+                    createModelComparisonRadar('radar-chart', latestMetrics);
+                    createTrainingProgressChart('training-chart', metricsHistory);
+                })
+                .catch(error => {
+                    console.error('Error loading sample metrics:', error);
+                    // Fallback to creating empty charts
+                    createEmptyCharts();
+                });
+        } else {
+            // We have data, create the charts
+            createAccuracyComparisonChart('accuracy-chart', metricsHistory);
+            createF1ScoreComparisonChart('f1-chart', metricsHistory);
+            createModelComparisonRadar('radar-chart', latestMetrics);
+            createTrainingProgressChart('training-chart', metricsHistory);
+        }
+    }
+    
+    // Create empty charts with placeholder data as fallback
+    function createEmptyCharts() {
+        // Create empty accuracy chart
+        const emptyLayout = {
+            title: 'No Data Available',
+            xaxis: { title: 'Training Round' },
+            yaxis: { title: 'Value' },
+            plot_bgcolor: COLORS.background,
+            paper_bgcolor: 'white',
+            height: 400
+        };
+        
+        const emptyTrace = [{
+            x: [0, 1, 2],
+            y: [0, 0, 0],
+            type: 'scatter',
+            mode: 'lines',
+            name: 'No Data',
+            line: { color: '#cccccc', dash: 'dash' }
+        }];
+        
+        Plotly.newPlot('accuracy-chart', emptyTrace, emptyLayout);
+        Plotly.newPlot('f1-chart', emptyTrace, emptyLayout);
+        Plotly.newPlot('training-chart', emptyTrace, emptyLayout);
+        
+        // Create empty radar chart
+        const emptyRadarTrace = [{
+            type: 'scatterpolar',
+            r: [0, 0, 0, 0],
+            theta: ['Accuracy', 'F1', 'Precision', 'Recall'],
+            fill: 'toself',
+            name: 'No Data'
+        }];
+        
+        const radarLayout = {
+            polar: {
+                radialaxis: { visible: true, range: [0, 100] }
+            },
+            title: 'No Data Available',
+            height: 400
+        };
+        
+        Plotly.newPlot('radar-chart', emptyRadarTrace, radarLayout);
+    }
+    
+    // Update dashboard metrics
+    function updateDashboardMetrics() {
+        if (latestMetrics.global && latestMetrics.global.accuracy !== undefined) {
+            document.getElementById('global-accuracy').textContent = (latestMetrics.global.accuracy * 100).toFixed(1) + '%';
+        }
+        
+        // Update round information
+        if (latestMetrics.round) {
+            document.getElementById('training-round').textContent = latestMetrics.round;
+        }
+        
+        // Update local models count
+        if (latestMetrics.local) {
+            const localModelsCount = Object.keys(latestMetrics.local).length;
+            document.getElementById('local-models-count').textContent = localModelsCount;
+            
+            // Find best local model
+            let bestModel = '';
+            let bestAccuracy = 0;
+            
+            Object.entries(latestMetrics.local).forEach(([name, metrics]) => {
+                if (metrics.accuracy > bestAccuracy) {
+                    bestModel = name;
+                    bestAccuracy = metrics.accuracy;
+                }
+            });
+            
+            if (bestModel) {
+                document.getElementById('best-local-model').textContent = `Best: ${bestModel} (${(bestAccuracy * 100).toFixed(1)}%)`;
+            }
+        }
+        
+        // Update system status
+        document.getElementById('system-status').textContent = latestMetrics.is_training ? 'Training' : 'Ready';
+    }
+    
+    // Load models data
+    function loadModelsData() {
+        fetch('/api/models/info')
+            .then(response => response.json())
+            .then(data => {
+                if (!data.error) {
+                    updateModelsCards(data);
+                }
+            })
+            .catch(error => console.error('Error loading models info:', error));
+    }
+    
+    // Update models cards
+    function updateModelsCards(data) {
+        if (!data || !data.local_models) return;
+        
+        const container = document.getElementById('local-models-cards');
+        if (!container) return;
+        
+        let html = '';
+        
+        Object.entries(data.local_models).forEach(([name, info]) => {
+            const isLoaded = info.is_loaded;
+            const modelType = info.model_type || 'Unknown';
+            const features = info.n_features || 'N/A';
+            const classes = info.n_classes || 'N/A';
+            
+            html += `
+                <div class="col-md-4 mb-3">
+                    <div class="model-card">
+                        <div class="model-header">
+                            <div class="model-title">
+                                <i class="fas fa-brain me-2"></i>
+                                ${name.charAt(0).toUpperCase() + name.slice(1)}
+                                <span class="model-badge ms-2">${modelType}</span>
+                            </div>
+                            <div>
+                                <span class="badge ${isLoaded ? 'bg-success' : 'bg-danger'}">
+                                    ${isLoaded ? 'Loaded' : 'Not Loaded'}
+                                </span>
+                            </div>
+                        </div>
+                        <div class="model-info">
+                            <div class="model-stat">
+                                <div class="model-stat-label">Features</div>
+                                <div class="model-stat-value">${features}</div>
+                            </div>
+                            <div class="model-stat">
+                                <div class="model-stat-label">Classes</div>
+                                <div class="model-stat-value">${classes}</div>
+                            </div>
+                            <div class="model-stat">
+                                <div class="model-stat-label">Accuracy</div>
+                                <div class="model-stat-value" id="${name}-accuracy">
+                                    ${latestMetrics.local && latestMetrics.local[name] ? 
+                                        (latestMetrics.local[name].accuracy * 100).toFixed(1) + '%' : 'N/A'}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="text-center mt-3">
+                            <button class="btn btn-sm btn-primary" onclick="regeneratePlot('${name}-chart')">
+                                <i class="fas fa-chart-line me-1"></i>
+                                View Details
+                            </button>
+                            ${name === 'xgboost' ? `
+                                <button class="btn btn-sm btn-warning ms-2" onclick="rebuildXGBoostModel()">
+                                    <i class="fas fa-sync-alt me-1"></i>
+                                    Rebuild
+                                </button>
+                            ` : ''}
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+        
+        container.innerHTML = html;
+    }
+    
+    // Training control functions
+    function startTraining() {
+        const sampleSize = parseInt(document.getElementById('sample-size').value);
+        const maxRounds = parseInt(document.getElementById('max-rounds-input').value);
+        
+        document.getElementById('start-training-btn').disabled = true;
+        document.getElementById('progress-text').textContent = 'Starting training...';
+        
+        fetch('/api/training/start', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                sample_size: sampleSize,
+                max_rounds: maxRounds
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                alert(`Error starting training: ${data.error}`);
+                document.getElementById('start-training-btn').disabled = false;
+                document.getElementById('progress-text').textContent = 'Ready to start';
+            } else {
+                document.getElementById('max-rounds').textContent = `Max: ${maxRounds}`;
+            }
+        })
+        .catch(error => {
+            console.error('Error starting training:', error);
+            alert('Error starting training. See console for details.');
+            document.getElementById('start-training-btn').disabled = false;
+            document.getElementById('progress-text').textContent = 'Ready to start';
+        });
+    }
+    
+    function stopTraining() {
+        document.getElementById('stop-training-btn').disabled = true;
+        document.getElementById('progress-text').textContent = 'Stopping training...';
+        
+        fetch('/api/training/stop', {
+            method: 'POST'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                alert(`Error stopping training: ${data.error}`);
+                document.getElementById('stop-training-btn').disabled = false;
+            }
+        })
+        .catch(error => {
+            console.error('Error stopping training:', error);
+            alert('Error stopping training. See console for details.');
+            document.getElementById('stop-training-btn').disabled = false;
+        });
+    }
+    
+    // Tab switching
+    function setupTabSwitching() {
+        document.querySelectorAll('.custom-tab').forEach(tab => {
+            tab.addEventListener('click', function() {
+                const tabGroup = this.closest('.card-body').querySelector('.custom-tabs').dataset.group || 'default';
+                const tabId = this.dataset.target;
+                
+                // Deactivate all tabs in this group
+                document.querySelectorAll(`.custom-tab[data-group="${tabGroup}"]`).forEach(t => {
+                    t.classList.remove('active');
+                });
+                
+                // Hide all tab contents in this group
+                document.querySelectorAll(`.tab-content[data-group="${tabGroup}"]`).forEach(content => {
+                    content.classList.remove('active');
+                });
+                
+                // Activate this tab and show its content
+                this.classList.add('active');
+                document.getElementById(tabId).classList.add('active');
+            });
+        });
+    }
+    
+    // Switch between tabs
+    function switchTab(tabId, tabGroup) {
+        // Hide all tabs in this group
+        document.querySelectorAll('.tab-content').forEach(tab => {
+            tab.classList.remove('active');
+        });
+        
+        // Deactivate all tab buttons
+        document.querySelectorAll('.custom-tab').forEach(tab => {
+            tab.classList.remove('active');
+        });
+        
+        // Show selected tab
+        document.getElementById(tabId).classList.add('active');
+        
+        // Activate clicked tab button
+        event.currentTarget.classList.add('active');
+    }
+</script>
+{% endblock %} 
