@@ -311,31 +311,84 @@ class PlotGenerator:
     
     def plot_improvement_percentages(self, improvement_data: Dict[str, Dict],
                                    save_name: Optional[str] = None) -> go.Figure:
-        """Create bar chart showing improvement percentages."""
+        """Create bar chart showing improvement percentages with enhanced error handling."""
         try:
             models = []
             metrics = []
             improvements = []
             
+            # Validate input data
+            if not improvement_data or len(improvement_data) == 0:
+                logger.warning("No improvement data provided, creating empty plot")
+                fig = go.Figure()
+                fig.add_annotation(
+                    text="No improvement data available",
+                    xref="paper", yref="paper",
+                    x=0.5, y=0.5,
+                    showarrow=False,
+                    font=dict(size=16, color="red")
+                )
+                fig.update_layout(
+                    title='Model Improvement Percentages',
+                    template="plotly_white",
+                    height=500
+                )
+                return fig
+            
+            # Process improvement data
             for model_name, model_improvements in improvement_data.items():
+                if not model_improvements:
+                    continue
+                    
                 for metric, improvement in model_improvements.items():
                     if 'improvement' in metric:
-                        models.append(model_name)
+                        models.append(model_name.replace('_', ' ').title())
                         metrics.append(metric.replace('_improvement', '').replace('_', ' ').title())
-                        improvements.append(improvement)
+                        # Convert to percentage and handle None values
+                        improvement_pct = (improvement * 100) if improvement is not None else 0.0
+                        improvements.append(improvement_pct)
             
+            # Check if we have any data to plot
+            if not models:
+                logger.warning("No valid improvement data found, creating placeholder plot")
+                fig = go.Figure()
+                fig.add_annotation(
+                    text="No improvement data to display",
+                    xref="paper", yref="paper",
+                    x=0.5, y=0.5,
+                    showarrow=False,
+                    font=dict(size=16, color="orange")
+                )
+                fig.update_layout(
+                    title='Model Improvement Percentages',
+                    template="plotly_white",
+                    height=500
+                )
+                return fig
+            
+            # Create DataFrame and plot
             df = pd.DataFrame({
                 'Model': models,
                 'Metric': metrics,
                 'Improvement (%)': improvements
             })
             
+            # Create the plot using plotly express
             fig = px.bar(df, x='Model', y='Improvement (%)', color='Metric',
                         title='Model Improvement Percentages',
                         barmode='group',
-                        template="plotly_white")
+                        template="plotly_white",
+                        color_discrete_sequence=['#3498db', '#e74c3c', '#2ecc71', '#f39c12'])
             
-            fig.update_layout(height=500)
+            fig.update_layout(
+                height=500,
+                xaxis_title='Model',
+                yaxis_title='Improvement (%)',
+                legend=dict(x=0.02, y=0.98)
+            )
+            
+            # Add value labels on bars
+            fig.update_traces(texttemplate='%{y:.1f}%', textposition='outside')
             
             if save_name:
                 filepath = self._save_plot(fig, f"{save_name}.html")
@@ -344,7 +397,21 @@ class PlotGenerator:
             
         except Exception as e:
             logger.error(f"Error creating improvement plot: {e}")
-            return go.Figure()
+            # Return error plot
+            fig = go.Figure()
+            fig.add_annotation(
+                text=f"Error creating improvement plot: {str(e)}",
+                xref="paper", yref="paper",
+                x=0.5, y=0.5,
+                showarrow=False,
+                font=dict(size=14, color="red")
+            )
+            fig.update_layout(
+                title='Model Improvement Percentages (Error)',
+                template="plotly_white",
+                height=500
+            )
+            return fig
     
     def plot_confusion_matrix(self, confusion_matrix: np.ndarray, class_names: List[str],
                              title: str = "Confusion Matrix",

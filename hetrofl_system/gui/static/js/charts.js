@@ -676,15 +676,228 @@ function regeneratePlot(containerId) {
     }
 }
 
+// Enhanced interactive chart controls
+function addChartControls(containerId) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    
+    // Add control buttons
+    const controlsDiv = document.createElement('div');
+    controlsDiv.className = 'chart-controls d-flex justify-content-end mb-3';
+    controlsDiv.innerHTML = `
+        <div class="btn-group btn-group-sm" role="group">
+            <button type="button" class="btn btn-outline-primary" onclick="zoomChart('${containerId}')">
+                <i class="fas fa-search-plus"></i>
+            </button>
+            <button type="button" class="btn btn-outline-primary" onclick="resetZoom('${containerId}')">
+                <i class="fas fa-search-minus"></i>
+            </button>
+            <button type="button" class="btn btn-outline-primary" onclick="exportChart('${containerId}')">
+                <i class="fas fa-download"></i>
+            </button>
+            <button type="button" class="btn btn-outline-primary" onclick="refreshChart('${containerId}')">
+                <i class="fas fa-sync-alt"></i>
+            </button>
+        </div>
+    `;
+    
+    container.parentNode.insertBefore(controlsDiv, container);
+}
+
+function zoomChart(containerId) {
+    const plotDiv = document.getElementById(containerId);
+    if (plotDiv && plotDiv.layout) {
+        Plotly.relayout(plotDiv, {
+            'xaxis.autorange': false,
+            'yaxis.autorange': false
+        });
+    }
+}
+
+function resetZoom(containerId) {
+    const plotDiv = document.getElementById(containerId);
+    if (plotDiv) {
+        Plotly.relayout(plotDiv, {
+            'xaxis.autorange': true,
+            'yaxis.autorange': true
+        });
+    }
+}
+
+function exportChart(containerId) {
+    const plotDiv = document.getElementById(containerId);
+    if (plotDiv) {
+        Plotly.downloadImage(plotDiv, {
+            format: 'png',
+            width: 1200,
+            height: 800,
+            filename: `hetrofl_${containerId}_${new Date().toISOString().split('T')[0]}`
+        });
+    }
+}
+
+function refreshChart(containerId) {
+    showPlotLoading(containerId);
+    
+    // Determine chart type and refresh accordingly
+    const chartType = containerId.split('-')[0];
+    
+    setTimeout(() => {
+        // Simulate refresh - in real implementation, this would fetch new data
+        regeneratePlot(containerId);
+    }, 1000);
+}
+
+// Enhanced plot generation with animations
+function createAnimatedChart(containerId, data, layout, config = {}) {
+    const defaultConfig = {
+        ...PLOT_CONFIG,
+        ...config
+    };
+    
+    // Add animation to layout
+    const animatedLayout = {
+        ...layout,
+        transition: {
+            duration: 500,
+            easing: 'cubic-in-out'
+        }
+    };
+    
+    return Plotly.newPlot(containerId, data, animatedLayout, defaultConfig)
+        .then(() => {
+            // Add interactive controls
+            addChartControls(containerId);
+            
+            // Add hover effects
+            const plotDiv = document.getElementById(containerId);
+            if (plotDiv) {
+                plotDiv.on('plotly_hover', function(data) {
+                    plotDiv.style.cursor = 'pointer';
+                });
+                
+                plotDiv.on('plotly_unhover', function(data) {
+                    plotDiv.style.cursor = 'default';
+                });
+            }
+        });
+}
+
+// Enhanced model performance chart with drill-down capability
+function createModelPerformanceChart(containerId, modelData, options = {}) {
+    try {
+        showPlotLoading(containerId);
+        
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        
+        // Create interactive performance chart
+        const traces = [];
+        const colors = ['#667eea', '#4facfe', '#43e97b', '#fa709a'];
+        
+        Object.entries(modelData).forEach(([modelName, metrics], index) => {
+            traces.push({
+                x: ['Accuracy', 'F1 Score', 'Precision', 'Recall'],
+                y: [
+                    (metrics.accuracy || 0) * 100,
+                    (metrics.f1_score || 0) * 100,
+                    (metrics.precision || 0) * 100,
+                    (metrics.recall || 0) * 100
+                ],
+                type: 'bar',
+                name: modelName,
+                marker: {
+                    color: colors[index % colors.length],
+                    line: {
+                        color: 'rgba(255,255,255,0.8)',
+                        width: 2
+                    }
+                },
+                hovertemplate: '<b>%{fullData.name}</b><br>' +
+                              '%{x}: %{y:.2f}%<br>' +
+                              '<extra></extra>'
+            });
+        });
+        
+        const layout = {
+            title: {
+                text: 'Model Performance Comparison',
+                font: { size: 18, family: 'Inter, sans-serif' }
+            },
+            xaxis: {
+                title: 'Metrics',
+                gridcolor: COLORS.grid,
+                gridwidth: 1
+            },
+            yaxis: {
+                title: 'Performance (%)',
+                gridcolor: COLORS.grid,
+                gridwidth: 1,
+                range: [0, 100]
+            },
+            barmode: 'group',
+            font: {
+                family: 'Inter, sans-serif',
+                color: COLORS.text
+            },
+            legend: {
+                orientation: 'h',
+                y: -0.2
+            },
+            margin: { t: 60, b: 80, l: 60, r: 30 },
+            plot_bgcolor: 'rgba(0,0,0,0)',
+            paper_bgcolor: 'white',
+            height: 450,
+            hovermode: 'closest'
+        };
+        
+        return createAnimatedChart(containerId, traces, layout);
+        
+    } catch (error) {
+        console.error('Error creating model performance chart:', error);
+        handlePlotError(containerId, 'Failed to create model performance chart.');
+    }
+}
+
+// Real-time chart updates with smooth transitions
+function updateChartData(containerId, newData) {
+    const plotDiv = document.getElementById(containerId);
+    if (!plotDiv) return;
+    
+    // Smooth data transition
+    Plotly.animate(plotDiv, {
+        data: newData
+    }, {
+        transition: {
+            duration: 500,
+            easing: 'cubic-in-out'
+        },
+        frame: {
+            duration: 500
+        }
+    });
+}
+
 // Function to update XGBoost model
 function rebuildXGBoostModel() {
     showPlotLoading('xgboost-status');
-    document.getElementById('xgboost-status').innerHTML = `
-        <div class="alert alert-info">
-            <i class="fas fa-sync fa-spin me-2"></i>
-            Rebuilding XGBoost model... This may take a few minutes.
-        </div>
-    `;
+    
+    const statusContainer = document.getElementById('xgboost-status');
+    if (statusContainer) {
+        statusContainer.innerHTML = `
+            <div class="alert alert-info">
+                <div class="d-flex align-items-center">
+                    <div class="spinner-border spinner-border-sm me-3" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <div>
+                        <strong>Rebuilding XGBoost model...</strong><br>
+                        <small>This may take a few minutes. Please wait.</small>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
     
     fetch('/api/models/rebuild_xgboost', {
         method: 'POST',
@@ -694,31 +907,115 @@ function rebuildXGBoostModel() {
     })
     .then(response => response.json())
     .then(data => {
-        if (data.success) {
-            document.getElementById('xgboost-status').innerHTML = `
-                <div class="alert alert-success">
-                    <i class="fas fa-check-circle me-2"></i>
-                    XGBoost model rebuilt successfully!
-                </div>
-            `;
-            // Reload model info
-            loadModelsData();
-        } else {
-            document.getElementById('xgboost-status').innerHTML = `
-                <div class="alert alert-danger">
-                    <i class="fas fa-exclamation-circle me-2"></i>
-                    Error rebuilding XGBoost model: ${data.error}
-                </div>
-            `;
+        if (statusContainer) {
+            if (data.success) {
+                statusContainer.innerHTML = `
+                    <div class="alert alert-success">
+                        <i class="fas fa-check-circle me-2"></i>
+                        <strong>XGBoost model rebuilt successfully!</strong><br>
+                        <small>Model is now ready for training.</small>
+                    </div>
+                `;
+                // Reload model info
+                if (typeof loadModelsData === 'function') {
+                    loadModelsData();
+                }
+            } else {
+                statusContainer.innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-circle me-2"></i>
+                        <strong>Error rebuilding XGBoost model:</strong><br>
+                        <small>${data.error}</small>
+                    </div>
+                `;
+            }
         }
     })
     .catch(error => {
         console.error('Error rebuilding XGBoost model:', error);
-        document.getElementById('xgboost-status').innerHTML = `
-            <div class="alert alert-danger">
-                <i class="fas fa-exclamation-circle me-2"></i>
-                Error rebuilding XGBoost model. See console for details.
-            </div>
-        `;
+        if (statusContainer) {
+            statusContainer.innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-circle me-2"></i>
+                    <strong>Error rebuilding XGBoost model</strong><br>
+                    <small>Network error. Please check console for details.</small>
+                </div>
+            `;
+        }
     });
-} 
+}
+
+// Enhanced loading states with skeleton screens
+function showSkeletonLoader(containerId) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    
+    container.innerHTML = `
+        <div class="skeleton-loader-container">
+            <div class="skeleton-loader mb-3" style="height: 30px; width: 60%;"></div>
+            <div class="skeleton-loader mb-2" style="height: 20px; width: 80%;"></div>
+            <div class="skeleton-loader mb-2" style="height: 20px; width: 70%;"></div>
+            <div class="skeleton-loader mb-2" style="height: 20px; width: 90%;"></div>
+            <div class="skeleton-loader mb-2" style="height: 20px; width: 60%;"></div>
+            <div class="skeleton-loader" style="height: 200px; width: 100%;"></div>
+        </div>
+    `;
+}
+
+// Toast notification system
+function showToast(message, type = 'info', duration = 5000) {
+    const toastContainer = document.getElementById('toast-container') || createToastContainer();
+    
+    const toastId = 'toast-' + Date.now();
+    const toastHTML = `
+        <div id="${toastId}" class="toast ${type}" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="toast-header">
+                <i class="fas fa-${getToastIcon(type)} me-2"></i>
+                <strong class="me-auto">${getToastTitle(type)}</strong>
+                <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+            <div class="toast-body">
+                ${message}
+            </div>
+        </div>
+    `;
+    
+    toastContainer.insertAdjacentHTML('beforeend', toastHTML);
+    
+    const toastElement = document.getElementById(toastId);
+    const toast = new bootstrap.Toast(toastElement, { delay: duration });
+    toast.show();
+    
+    // Remove toast element after it's hidden
+    toastElement.addEventListener('hidden.bs.toast', () => {
+        toastElement.remove();
+    });
+}
+
+function createToastContainer() {
+    const container = document.createElement('div');
+    container.id = 'toast-container';
+    container.className = 'toast-container';
+    document.body.appendChild(container);
+    return container;
+}
+
+function getToastIcon(type) {
+    const icons = {
+        success: 'check-circle',
+        error: 'exclamation-triangle',
+        warning: 'exclamation-circle',
+        info: 'info-circle'
+    };
+    return icons[type] || 'info-circle';
+}
+
+function getToastTitle(type) {
+    const titles = {
+        success: 'Success',
+        error: 'Error',
+        warning: 'Warning',
+        info: 'Information'
+    };
+    return titles[type] || 'Notification';
+}

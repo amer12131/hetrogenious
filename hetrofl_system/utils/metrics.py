@@ -412,6 +412,10 @@ class MetricsTracker:
         except Exception as e:
             logger.warning(f"Could not create baseline metrics: {e}")
     
+    def ensure_baseline_metrics(self):
+        """Public method to ensure baseline metrics exist."""
+        self._ensure_baseline_metrics()
+    
     def get_metrics_for_visualization(self, model_name: Optional[str] = None) -> Dict[str, List[float]]:
         """Get metrics data formatted for visualization with fallbacks."""
         try:
